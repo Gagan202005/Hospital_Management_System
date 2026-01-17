@@ -1,25 +1,39 @@
 const mongoose = require("mongoose");
+const { string } = require("zod");
 
 const ambulanceschema = new mongoose.Schema(
     {
-    drivername:{
+    driverName:{
         type:String,
+        required:true,
     },
-    MobileNo:{
+    driverContact:{
         type:String,
+        required:true,
         length : 10,
     },
-    numberplate:{
+    vehicleNumber:{
         type:String,
-    },
-    charges:{
-        type:Number,
+        required:true,
     },
     availability:{
         type:Boolean,
+        required:true,
         default:true,
+    },
+    year:{
+        type:string,
+        required:true,
+    },
+    model:{
+        type:string,
+        required:true,
+    },
+    driverLicense:{
+        type:string,
+        required:true,
+    },
     }
-}
 );
 
 

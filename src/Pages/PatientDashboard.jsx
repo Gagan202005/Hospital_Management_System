@@ -1,10 +1,10 @@
 import { SidebarProvider, SidebarTrigger } from "../Components/ui/sidebar";
-import PatientSidebar  from "../Components/Core/dashboard/PatientSidebar";
+import PatientSidebar  from "../Components/Core/Patient/PatientSidebar";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import  PatientAppointmentsSection  from "../Components/Core/dashboard/PatientAppointmentSection";
-import  PatientProfileSection  from "../Components/Core/dashboard/PatientProfileSection";
-import  PatientReportsSection  from "../Components/Core/dashboard/PatientReportsSection";
-import PatientOverview from "../Components/Core/dashboard/PatientOverview";
+import  PatientAppointmentsSection  from "../Components/Core/Patient/PatientAppointmentSection";
+import  PatientProfileSection  from "../Components/Core/Patient/PatientProfileSection";
+import  PatientReportsSection  from "../Components/Core/Patient/PatientReportsSection";
+import PatientOverview from "../Components/Core/Patient/PatientOverview";
 import { useDispatch, useSelector } from "react-redux"
 import { useNavigate } from "react-router-dom"
 import { logout } from "../services/operations/authApi"

@@ -1,9 +1,6 @@
 const Doctor = require("../models/Doctor");
 const Patient = require("../models/Patient");
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const OTP = require("../models/OTP")
-const otpGenerator = require("otp-generator");
 const Appointment = require("../models/Appointment");
 const Admin = require("../models/Admin");
 const Bed = require("../models/Bed");
@@ -12,68 +9,154 @@ const Ambulance = require("../models/Ambulance");
 const Slot = require("../models/Slot");
 require("dotenv").config();
 
-exports.Add_Doctor = async (req,res) =>{
-    try{
-        const {firstName,lastName,email,password,bloodgroup,phoneno,age,gender,
-            address,DOB,about,department,qualification,experience,otp,confirmpassword} = req.body;
-            if(!firstName || !lastName || !email || !password || !confirmpassword
-             || !bloodgroup || !phoneno || !age
-            || !gender || !address || !DOB || !about || !department
-            || !qualification || !experience || !otp){
-                return res.status(500).json({
-                    success : false,
-                    message : "all fields are required",
-                });
-            }
-        const existingUser = await Doctor.findOne({email});
-        if(existingUser){
-            return res.status(500).json({
-            success : false,
-            message : "you are already registered with us",
-            });
-        }
-        if(password!==confirmpassword){
-            return res.status(500).json({
-            success : false,
-            message : "password is wrong",
-            });
-        }
-        const response = await OTP.find({email}).sort({ createdAt: -1 }).limit(1);
-        if(!response){
-            // Invalid OTP
-            return res.status(500).json({
-            success : false,
-            message : "otp is wrong",
-            });
-        }
-        else if (otp !== response[0].otp) {
-			// Invalid OTP
-			return res.status(400).json({
-				success: false,
-				message: "The OTP is not valid",
-			});
-		}
-        // Hash the password
-		const hashedPassword = await bcrypt.hash(password, 10);
+exports.Add_Doctor = async (req, res) => {
+    try {
+        const {
+            firstName, lastName, email, phoneno,
+            password, confirmPassword,
+            dob, age, gender, bloodGroup, address,
+            department, specialization, experience, consultationFee,
+            degree, college // These come as separate strings from frontend
+        } = req.body;
 
+        // 1. Validation
+        if (!firstName || !lastName || !email || !password || !department || !consultationFee) {
+            return res.status(400).json({ success: false, message: "Missing required fields" });
+        }
+        if (password !== confirmPassword) {
+            return res.status(400).json({ success: false, message: "Passwords do not match" });
+        }
+
+        // 2. Check Existing
+        const existingUser = await Doctor.findOne({ email });
+        if (existingUser) {
+            return res.status(409).json({ success: false, message: "Doctor email already registered" });
+        }
+
+        // 3. Hash Password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // 4. Construct Qualification Array
+        const qualificationList = [];
+        if (degree && college) {
+            qualificationList.push({ degree, college });
+        }
+
+        // 5. Create Doctor
         const doctor = await Doctor.create({
-            firstName,lastName,email,
-            bloodgroup,phoneno,age,gender,
-            address,DOB,about,department,
-            qualification,experience,
+            firstName,
+            lastName,
+            email,
             password: hashedPassword,
+            phoneno,
+            dob,
+            age,
+            gender,
+            bloodGroup,
+            address,
+            department,
+            specialization,
+            experience,
+            consultationFee,
+            qualification: qualificationList, // Save the array
+            image: `https://api.dicebear.com/6.x/initials/svg?seed=Dr ${lastName}&backgroundColor=00acc1`,
+            accountType: "Doctor"
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: doctor,
+            message: "Doctor registered successfully",
+        });
+
+    } catch (error) {
+        console.error("Add Doctor Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to register doctor",
+            error: error.message,
+        });
+    }
+};
+
+exports.Add_Patient = async (req, res) => {
+    try {
+        // 1. Destructure using FRONTEND variable names
+        // (The frontend sends 'dob', 'phone', 'confirmPassword')
+        const {
+            firstName,
+            lastName,
+            email,
+            password,
+            confirmPassword, // Matches frontend
+            phone,           // Matches frontend
+            age,
+            gender,
+            address,
+            dob,             // Matches frontend (format: "YYYY-MM-DD")
+            emergencyContact // Optional: Add if your model has this field
+        } = req.body;
+
+        // 2. Validate all fields are present
+        if (
+            !firstName || !lastName || !email || !password || 
+            !confirmPassword || !phone || !age || !gender || 
+            !address || !dob
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "All fields are required",
+            });
+        }
+
+        // 3. Check if user already exists
+        const existingUser = await Patient.findOne({ email });
+        if (existingUser) {
+            return res.status(409).json({ // 409 = Conflict
+                success: false,
+                message: "User is already registered with us",
+            });
+        }
+
+        // 4. Validate Passwords
+        if (password !== confirmPassword) {
+            return res.status(400).json({
+                success: false,
+                message: "Passwords do not match",
+            });
+        }
+
+        // 5. Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // 6. Create the Patient Entry
+        // Mongoose automatically casts the "YYYY-MM-DD" string from 'dob' to a Date object
+        const patient = await Patient.create({
+            firstName,
+            lastName,
+            email,
+            phoneno: phone,   // MAP: frontend 'phone' -> db 'phoneno'
+            age,
+            gender,
+            address,
+            DOB: dob,         // MAP: frontend 'dob' -> db 'DOB'
+            password: hashedPassword,
+            emergencyContactPhone:emergencyContact,
             image: `https://api.dicebear.com/6.x/initials/svg?seed=${firstName} ${lastName}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=solid,gradientLinear&backgroundRotation=0,360,-350,-340,-330,-320&fontFamily=Arial&fontWeight=600`,
         });
+
+        // 7. Success Response
         return res.status(200).json({
-			success: true,
-			user:doctor,
-			message: "User registered successfully",
-		});
-    }
-    catch{
+            success: true,
+            user: patient,
+            message: "Patient registered successfully",
+        });
+
+    } catch (error) {
+        console.error("Registration Error:", error); // Log error for debugging
         return res.status(500).json({
-            success : false,
-            message : "something went wrong",
+            success: false,
+            message: "Something went wrong while registering patient",
         });
     }
 };
@@ -119,10 +202,11 @@ exports.fix_appointment = async (req,res) =>{
 
 exports.add_admin = async (req,res) => {
     try{
-        const {firstName,lastName,email,password,phoneno,age,gender,
-            address,otp,confirmpassword} = req.body;
-            if(!firstName || !lastName || !email || !password || !confirmpassword
-             || !phoneno || !age || !gender || !address || !otp){
+        const {firstName, lastName, email, phoneno, 
+            age, gender, dob, address, 
+            password, confirmPassword } = req.body;
+            if(!firstName || !lastName || !email || !password || !confirmPassword
+             || !phoneno || !age || !gender || !address || !dob){
                 return res.status(500).json({
                     success : false,
                     message : "all fields are required",
@@ -135,34 +219,18 @@ exports.add_admin = async (req,res) => {
             message : "you are already registered with us",
             });
         }
-        if(password!==confirmpassword){
+        if(password!==confirmPassword){
             return res.status(500).json({
             success : false,
             message : "password is wrong",
             });
         }
-        const response = await OTP.find({email}).sort({ createdAt: -1 }).limit(1);
-        if(!response){
-            // Invalid OTP
-            return res.status(500).json({
-            success : false,
-            message : "otp is wrong",
-            });
-        }
-        else if (otp !== response[0].otp) {
-			// Invalid OTP
-			return res.status(400).json({
-				success: false,
-				message: "The OTP is not valid",
-			});
-		}
         // Hash the password
 		const hashedPassword = await bcrypt.hash(password, 10);
 
         const admin = await Admin.create({
-            firstName,lastName,email,
-            bloodgroup,phoneno,age,gender,
-            address,DOB,about,
+            firstName, lastName, email, phoneno, 
+            age, gender, dob, address, 
             password: hashedPassword,
             image: `https://api.dicebear.com/6.x/initials/svg?seed=${firstName} ${lastName}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=solid,gradientLinear&backgroundRotation=0,360,-350,-340,-330,-320&fontFamily=Arial&fontWeight=600`,
         });
@@ -183,14 +251,14 @@ exports.add_admin = async (req,res) => {
 
 exports.add_bed = async (req,res) => {
     try{
-        const {bed_number,room_number} = req.body;
-        if(!bed_number || !room_number){
+        const {bedNumber,ward,type,roomNumber,floorNumber,status} = req.body;
+        if(!bedNumber || !ward || !type || !roomNumber || !floorNumber || !status){
             return res.status(500).json({
                 success : false,
                 message : "all fields are req",
             });
         }
-        const existingbed = await Bed.findOne({bed_number});
+        const existingbed = await Bed.findOne({bedNumber});
         if(existingbed){
             return res.status(500).json({
             success : false,
@@ -198,8 +266,7 @@ exports.add_bed = async (req,res) => {
         });
         }
         const bed = await Bed.create({
-            bed_number ,
-            room_number,
+            bedNumber,ward,type,roomNumber,floorNumber,status
         });
         return res.status(200).json({
             success : true,
@@ -258,14 +325,14 @@ exports.add_nurse = async (req,res) => {
 
 exports.add_ambulance = async (req,res) => {
     try{
-        const {drivername,MobileNo,numberplate,charges} = req.body;
-        if(!drivername || !MobileNo || !numberplate || !charges){
+        const {vehicleNumber,model,year,driverName,driverLicense,driverContact} = req.body;
+        if(!vehicleNumber || !model || !year || !driverName || !driverLicense || !driverContact){
             return res.status(500).json({
                 success : false,
                 message : "all fields are req",
             });
         }
-        const existingambulance = await Ambulance.findOne({numberplate});
+        const existingambulance = await Ambulance.findOne({vehicleNumber});
         if(existingambulance){
             return res.status(500).json({
             success : false,
@@ -273,7 +340,7 @@ exports.add_ambulance = async (req,res) => {
         });
         }
         const ambulance = await Ambulance.create({
-            drivername,MobileNo,numberplate,charges
+            vehicleNumber,model,year,driverName,driverLicense,driverContact
         });
         return res.status(200).json({
             success : true,

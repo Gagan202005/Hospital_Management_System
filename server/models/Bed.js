@@ -1,24 +1,62 @@
 const mongoose = require("mongoose");
-const Patient = require("./Patient");
 
-const bedschema = new mongoose.Schema(
-    {
-    bed_number:{
-        type:String,
+const bedSchema = new mongoose.Schema(
+  {
+    bedNumber: {
+      type: String,
+      required: true,
+      unique: true, // A bed number (e.g., A-101) should be unique across the hospital
+      trim: true,
     },
-    room_number:{
-        type:String,
+    ward: {
+      type: String,
+      required: true,
+      enum: [
+        "emergency",
+        "icu",
+        "cardiology",
+        "orthopedics",
+        "pediatrics",
+        "maternity",
+        "surgery",
+        "general",
+      ],
     },
-    availability:{
-        type:Boolean,
-        default:true,
+    type: {
+      type: String,
+      required: true,
+      enum: [
+        "standard",
+        "icu",
+        "emergency",
+        "pediatric",
+        "maternity",
+        "isolation",
+      ],
     },
-    patient:{
-        type : mongoose.Schema.Types.ObjectId,
-        ref : "Patient",
-        default:null,
-    }
-}
+    roomNumber: {
+      type: String, // String allows for values like "104-B" or "ICU-2"
+      required: true,
+      trim: true,
+    },
+    floorNumber: {
+      type: Number,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["Available", "Occupied", "Maintenance", "Cleaning"],
+      default: "Available",
+      required: true,
+    },
+    // Reference to a Patient model if the bed is Occupied
+    patient: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Patient", 
+      default: null,
+    },
+  },
+  { timestamps: true }
 );
 
-module.exports = mongoose.model("Bed", bedschema);
+module.exports = mongoose.model("Bed", bedSchema);

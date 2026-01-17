@@ -21,6 +21,7 @@ function App() {
   return (
     <div>
       <Routes>
+        
         <Route path="/login" element={<OpenRoute>
           <Login />
         </OpenRoute>} />
@@ -35,7 +36,7 @@ function App() {
         </OpenRoute>} />
         <Route path='/verify-email' element={<Verify_email/>}></Route>
         <Route path="/doctor-dashboard" element={<PrivateRoute><DoctorDashboard /></PrivateRoute>} />
-        <Route path="/patient-dashboard/*" element={<PrivateRoute><PatientDashboard /></PrivateRoute>} />
+        <Route path="/patient-dashboard/*" element={<PrivateRoute><><NavBar setProgress={setProgress}></NavBar><PatientDashboard /></></PrivateRoute>} />
         <Route path="/admin-dashboard" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
       </Routes>
       <Toaster />

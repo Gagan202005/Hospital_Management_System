@@ -17,7 +17,7 @@ import { patientsidebardata } from "../../../Data/sidebarlinks";
 export default function PatientSidebar({ onLogout }) {
 
   return (
-    <Sidebar className="w-64">
+    <Sidebar className="w-64 pt-[200px]">
       <SidebarHeader className="p-6">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">

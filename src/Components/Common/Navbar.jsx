@@ -1,7 +1,7 @@
 import { Link} from 'react-router-dom'
 import { NavbarLinks } from '../../Data/navbarlinks'
 import { useSelector } from 'react-redux'
-import DropDown from '../Core/dashboard/Dropdown'
+import DropDown from '../Core/Patient/Dropdown'
 import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router'
 import { Phone, Clock, MapPin, Menu } from "lucide-react";
