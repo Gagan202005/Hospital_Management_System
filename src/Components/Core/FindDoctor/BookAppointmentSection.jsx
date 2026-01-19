@@ -14,7 +14,7 @@ import { useToast } from "../../../hooks/use-toast";
 import { useSelector } from "react-redux";
 // Import API Services
 import { fetchDoctorDetails } from "../../../services/operations/DoctorApi";
-import { fetchTimeSlots, bookAppointmentApi } from "../../../services/operations/AppointmentApi";
+import { fetchTimeSlotsbyDate, bookAppointmentApi } from "../../../services/operations/DoctorApi";
 const BookAppointment = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -80,7 +80,7 @@ const { token } = useSelector((state) => state.auth);
       
       try {
         const formattedDate = format(selectedDate, "yyyy-MM-dd");
-        const slots = await fetchTimeSlots(id, formattedDate);
+        const slots = await fetchTimeSlotsbyDate(id, formattedDate);
         setAvailableSlots(slots || []);
       } catch (error) {
         console.error("Slot Load Error", error);

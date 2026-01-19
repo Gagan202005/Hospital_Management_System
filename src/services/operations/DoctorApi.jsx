@@ -5,11 +5,14 @@ import { setLoading, setUser } from "../../Slices/profileslice"; // Adjust path 
 const {
   UPDATE_DOCTOR_PROFILE_API, 
   UPDATE_DOCTOR_IMAGE_API, // Ensure this exists in your API endpoints
-  GET_PUBLIC_DOCTORS_API,GET_DOCTOR_DETAILS_API,
+  GET_PUBLIC_DOCTORS_API,GET_DOCTOR_DETAILS_API,GET_DOCTOR_PATIENTS_API,
+  GET_DOCTOR_APPOINTMENTS_API, 
+  UPDATE_APPOINTMENT_STATUS_API, 
+  BOOK_APPOINTMENT_API,
+  ADD_TIME_SLOT_API, DELETE_TIME_SLOT_API,GET_DOCTOR_SLOTS_API,FETCH_TIME_SLOTS_API
 } = Doctorendpoints;
 
 
-const { ADD_TIME_SLOT_API, FETCH_TIME_SLOTS_API, DELETE_TIME_SLOT_API } = Doctorendpoints;
 
 // --- FETCH SLOTS ---
 export const fetchTimeSlots = async (token) => {
@@ -256,6 +259,117 @@ export const fetchDoctorDetails = async (doctorId) => {
   } catch (error) {
     console.log("FETCH_DOCTOR_DETAILS_ERROR:", error);
     // Optional: toast.error("Failed to load doctor details");
+  }
+  return result;
+};
+
+export const fetchDoctorPatients = async (token) => {
+  let result = [];
+  try {
+    const response = await apiConnector(
+      "GET",
+      GET_DOCTOR_PATIENTS_API,
+      null,
+      { Authorization: `Bearer ${token}` }
+    );
+
+    if (!response?.data?.success) {
+      throw new Error(response?.data?.message);
+    }
+
+    result = response.data.data;
+  } catch (error) {
+    console.log("FETCH_PATIENTS_ERROR:", error);
+  }
+  return result;
+};
+
+
+// --- 1. Fetch Appointments ---
+export const fetchDoctorAppointments = async (token) => {
+  try {
+    const response = await apiConnector(
+      "GET", 
+      GET_DOCTOR_APPOINTMENTS_API, 
+      null, 
+      { Authorization: `Bearer ${token}` }
+    );
+
+    if (!response.data.success) {
+      throw new Error(response.data.message);
+    }
+    return response.data.data;
+  } catch (error) {
+    console.error("FETCH_APPOINTMENTS_ERROR", error);
+    return [];
+  }
+};
+
+// --- 2. Update Status (Cancel/Confirm) ---
+export const updateAppointmentStatus = async (token, data) => {
+  try {
+    const response = await apiConnector(
+      "POST", 
+      UPDATE_APPOINTMENT_STATUS_API, 
+      data, 
+      { Authorization: `Bearer ${token}` }
+    );
+
+    if (!response.data.success) {
+      throw new Error(response.data.message);
+    }
+    return response.data.data;
+  } catch (error) {
+    console.error("UPDATE_STATUS_ERROR", error);
+    toast.error("Failed to update status");
+    throw error; 
+  }
+};
+
+
+export const bookAppointmentApi = async (data,token,navigate) => {
+  try {
+    const response = await apiConnector("POST", BOOK_APPOINTMENT_API, data,{Authorization: `Bearer ${token}`});
+
+    if (!response?.data?.success) {
+      throw new Error(response.data.message);
+    }
+
+    toast({
+      title: "Success!",
+      description: "Appointment booked successfully.",
+    });
+    
+    navigate("/"); 
+  } catch (error) {
+    console.log("BOOK_APPOINTMENT_ERROR:", error);
+    toast({
+      title: "Booking Failed",
+      description: error.response?.data?.message || "Could not book appointment",
+      variant: "destructive"
+    });
+  }
+};
+
+export const fetchTimeSlotsbyDate = async (doctorId, date) => {
+  let result = [];
+  try {
+    // Call: /appointment/slots/:doctorId?date=YYYY-MM-DD
+    const response = await apiConnector(
+      "GET", 
+      `${GET_DOCTOR_SLOTS_API}/${doctorId}`, 
+      null, 
+      null, 
+      { date } 
+    );
+    
+    if (!response?.data?.success) {
+      throw new Error(response.data.message);
+    }
+    result = response.data.data;
+  } catch (error) {
+    console.log("FETCH_SLOTS_ERROR:", error);
+    // Silent fail or toast depending on preference
   }
   return result;
 };

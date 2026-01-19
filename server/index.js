@@ -6,7 +6,7 @@ const PatientRoutes = require("./routes/Patient_routes");
 const AdminRoutes = require("./routes/Admin_routes");
 const AuthRoutes = require("./routes/Auth_routes");
 const DoctorRoutes = require("./routes/Doctor_routes");
-const AppointmentRoutes = require("./routes/Appointment_routes");
+const medicalRecordRoutes = require("./routes/Report_routes");
 
 const database = require("./config/database");
 const cookieParser = require("cookie-parser");
@@ -53,8 +53,7 @@ app.use("/api/v1/auth", AuthRoutes);
 
 app.use("/api/v1/Doctor", DoctorRoutes);
 
-app.use("/api/v1/appointment", AppointmentRoutes);
-
+app.use("/api/v1/medical-record", medicalRecordRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({

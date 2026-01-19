@@ -396,3 +396,140 @@ exports.bookAppointment = async (req, res) => {
     return res.status(500).json({ success: false, message: "Booking failed" });
   }
 };
+
+exports.getDoctorPatients = async (req, res) => {
+  try {
+    const doctorId = req.user.id;
+    const now = new Date();
+
+    // Fetch all appointments sorted by newest first
+    const appointments = await Appointment.find({ doctor: doctorId }).sort({ date: -1 });
+
+    const patientMap = new Map();
+
+    appointments.forEach((appt) => {
+      const email = appt.patientDetails.email;
+
+      if (!patientMap.has(email)) {
+        patientMap.set(email, {
+          id: appt._id, 
+          name: `${appt.patientDetails.firstName} ${appt.patientDetails.lastName || ""}`.trim(),
+          email: appt.patientDetails.email,
+          phone: appt.patientDetails.phone,
+          visitCount: 0,
+          lastVisit: null,  
+          status: "Inactive", // Default
+          history: []       // We will fill this
+        });
+      }
+
+      const patient = patientMap.get(email);
+      patient.visitCount += 1;
+
+      // Determine Status & Primary Date
+      const apptDate = new Date(appt.date);
+      
+      if (apptDate > now) {
+          patient.status = "Active"; // They have an upcoming booking
+          patient.lastVisit = appt.date; // Show next visit date
+      } else if (!patient.lastVisit && patient.status !== "Active") {
+          patient.lastVisit = appt.date; // Show last past visit
+      }
+
+      // Add to history list
+      patient.history.push({
+        date: appt.date,
+        reason: appt.reason,
+        status: appt.status // Scheduled/Completed/Cancelled
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: Array.from(patientMap.values()),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Error fetching patients" });
+  }
+};
+
+// =================================================================
+// 1. GET APPOINTMENT SCHEDULE (Flat List for Appointments Page)
+// =================================================================
+exports.getDoctorAppointments = async (req, res) => {
+  try {
+    const doctorId = req.user.id; // From Auth Middleware
+
+    // Fetch appointments sorted by date (Ascending: Earliest first)
+    // .lean() converts mongoose docs to plain JS objects for performance
+    const appointments = await Appointment.find({ doctor: doctorId })
+      .sort({ date: 1 }) 
+      .lean(); 
+
+    return res.status(200).json({
+      success: true,
+      count: appointments.length,
+      data: appointments,
+    });
+
+  } catch (error) {
+    console.error("GET_APPOINTMENTS_ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch appointment schedule",
+      error: error.message,
+    });
+  }
+};
+
+// =================================================================
+// 2. UPDATE APPOINTMENT STATUS (Cancel, Confirm, etc.)
+// =================================================================
+exports.updateAppointmentStatus = async (req, res) => {
+  try {
+    const { appointmentId, status } = req.body; 
+
+    // Validate Status against your Schema Enum
+    const validStatuses = ["Scheduled", "Confirmed", "Cancelled", "Completed", "Pending"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid status provided" 
+      });
+    }
+
+    // Find and Update
+    const appointment = await Appointment.findByIdAndUpdate(
+      appointmentId,
+      { status: status },
+      { new: true } // Return the updated document
+    );
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    // Logic: If Cancelling, free up the TimeSlot
+    // This makes the slot available for booking again
+    if (status === "Cancelled" && appointment.timeSlotId) {
+       await TimeSlot.findByIdAndUpdate(appointment.timeSlotId, { isBooked: false });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Appointment marked as ${status}`,
+      data: appointment,
+    });
+
+  } catch (error) {
+    console.error("UPDATE_STATUS_ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update appointment status",
+      error: error.message,
+    });
+  }
+};

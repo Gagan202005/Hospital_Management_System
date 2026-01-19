@@ -7,7 +7,7 @@ const Doctor = require("../models/Doctor");
 const Appointment = require("../models/Appointment");
 const {instance} = require("../config/razorpay");
 const crypto = require("crypto");
-const Report = require("../models/Report")
+const Report = require("../models/Medicalrecord")
 require("dotenv").config();
 const {uploadImageToCloudinary} = require("../utils/imageUploader");
 // Signup Controller for Registering USers

@@ -2,7 +2,7 @@ import { SidebarProvider, SidebarTrigger } from "../Components/ui/sidebar";
 import { DoctorSidebar } from "../Components/Core/Doctor/DoctorSidebar";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { TimeSlotManager } from "../Components/Core/Doctor/TimeSlotManager";
-import { AppointmentsSection } from "../Components/Core/Doctor/AppointmentSection";
+import AppointmentSection from "../Components/Core/Doctor/AppointmentSection";
 import { PatientsSection } from "../Components/Core/Doctor/PatientsSection";
 import { DoctorProfileSection } from "../Components/Core/Doctor/DoctorProfileSection";
 import { PatientReportsGenerator } from "../Components/Core/Doctor/PatientReportsGenerator";
@@ -45,7 +45,7 @@ const DoctorDashboard = () => {
             <Route path="/" element={<Navigate to="/doctor-dashboard/overview" replace />} />
             <Route path="/overview" element={<DoctorOverview />} />
             <Route path="/timeslots" element={<TimeSlotManager />} />
-            <Route path="/appointments" element={<AppointmentsSection />} />
+            <Route path="/appointments" element={<AppointmentSection />} />
             <Route path="/patients" element={<PatientsSection />} />
             <Route path="/prescriptions" element={<PrescriptionManager />} />
             <Route path="/reports" element={<PatientReportsGenerator />} />

@@ -39,9 +39,17 @@ export const Doctorendpoints = {
   UPDATE_DOCTOR_PROFILE_API : BASE_URL + "/Doctor/editprofile",
   GET_PUBLIC_DOCTORS_API : BASE_URL + "/Doctor/public/search",
   GET_DOCTOR_DETAILS_API : BASE_URL + "/doctor/public/profile",
+  GET_DOCTOR_PATIENTS_API : BASE_URL + "/doctor/patients", 
+  GET_DOCTOR_APPOINTMENTS_API: BASE_URL + "/doctor/appointments",
+  UPDATE_APPOINTMENT_STATUS_API: BASE_URL + "/doctor/update-status",
+  GET_DOCTOR_SLOTS_API : BASE_URL + "/doctor/slots",
+  BOOK_APPOINTMENT_API : BASE_URL + "/doctor/book",
 }
 
-export const AppointmentEndpoints = {
-  GET_DOCTOR_SLOTS_API : BASE_URL + "/appointment/slots",
-  BOOK_APPOINTMENT_API : BASE_URL + "/appointment/book",
+export const MedicalRecordEndpoints={
+  // Create Report (Mark as Completed)
+  CREATE_VISIT_REPORT_API: BASE_URL + "/medical-record/create",
+  
+  // View Report
+  GET_REPORT_BY_ID_API: (appointmentId) => BASE_URL + `/medical-record/${appointmentId}`,
 }
