@@ -11,6 +11,9 @@ import { AddAmbulanceSection } from "../Components/Core/Admin/AddAmbulanceSectio
 import { AddBedSection } from "../Components/Core/Admin/AddBedSection";
 import { OverviewSection } from "../Components/Core/Admin/OverviewSection";
 import { AddAdminSection } from "../Components/Core/Admin/AddAdminSection.jsx";
+import { UserCircle } from "lucide-react"; // Import icon for profile
+import { AdminProfileSection } from "../Components/Core/Admin/AdminProfileSection.jsx"; // IMPORT NEW COMPONENT
+
 const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-medical-50 to-care-50">
@@ -26,13 +29,19 @@ const AdminDashboard = () => {
           </p>
         </div>
 
+        {/* Change defaultValue if you want profile to be first, otherwise keep 'overview' */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-white/50 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-7 bg-white/50 backdrop-blur-sm"> 
+            {/* Note: Changed grid-cols-6 to grid-cols-7 to fit new tab */}
+            
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="patients" className="flex items-center gap-2">
+            
+            {/* ... Existing Triggers (Patients, Doctors, Ambulances, Beds) ... */}
+
+             <TabsTrigger value="patients" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Patients
             </TabsTrigger>
@@ -52,9 +61,16 @@ const AdminDashboard = () => {
               <BarChart3 className="w-4 h-4" />
               Admins
             </TabsTrigger>
+
+            {/* ADD THIS NEW TRIGGER */}
+            <TabsTrigger value="profile" className="flex items-center gap-2">
+              <UserCircle className="w-4 h-4" />
+              Profile
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview">
+          {/* ... Existing Content ... */}
+           <TabsContent value="overview">
             <OverviewSection />
           </TabsContent>
 
@@ -77,6 +93,12 @@ const AdminDashboard = () => {
           <TabsContent value="admins">
             <AddAdminSection/>
           </TabsContent>
+
+          {/* ADD THIS NEW CONTENT */}
+          <TabsContent value="profile">
+            <AdminProfileSection />
+          </TabsContent>
+
         </Tabs>
       </main>
 

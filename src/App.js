@@ -35,7 +35,7 @@ function App() {
           <Signup />
         </OpenRoute>} />
         <Route path='/verify-email' element={<Verify_email/>}></Route>
-        <Route path="/doctor-dashboard" element={<PrivateRoute><DoctorDashboard /></PrivateRoute>} />
+        <Route path="/doctor-dashboard/*" element={<PrivateRoute><NavBar setProgress={setProgress}></NavBar><DoctorDashboard /></PrivateRoute>} />
         <Route path="/patient-dashboard/*" element={<PrivateRoute><><NavBar setProgress={setProgress}></NavBar><PatientDashboard /></></PrivateRoute>} />
         <Route path="/admin-dashboard" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
       </Routes>

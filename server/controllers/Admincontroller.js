@@ -427,6 +427,69 @@ exports.discharge_patient = async (req,res) => {
     }
 }
 
+// --- 1. UPDATE PROFILE DETAILS ---
+exports.updateAdminProfile = async (req, res) => {
+  try {
+    // 1. Get Admin ID from middleware (req.user)
+    const adminId = req.user.id;
+
+    // 2. Get data from body
+    // We only extract fields that are allowed to be updated via this API
+    const {
+      firstName,
+      lastName,
+      phoneno,
+      dob,
+      age,
+      gender,
+      address,
+      about
+    } = req.body;
+
+    // 3. Find the Admin
+    const admin = await Admin.findById(adminId);
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin account not found",
+      });
+    }
+
+    // 4. Update Fields (Only if provided)
+    if (firstName) admin.firstName = firstName;
+    if (lastName) admin.lastName = lastName;
+    if (phoneno) admin.phoneno = phoneno;
+    if (dob) admin.dob = dob;
+    if (age) admin.age = age;
+    if (gender) admin.gender = gender;
+    if (address) admin.address = address;
+    if (about) admin.about = about;
+
+    // 5. Save updates
+    await admin.save();
+
+    // 6. Return response
+    // Remove sensitive data before sending back
+    admin.password = undefined;
+    admin.token = undefined;
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: admin, // This data updates Redux/LocalStorage
+    });
+
+  } catch (error) {
+    console.error("UPDATE_ADMIN_PROFILE_ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update profile",
+      error: error.message,
+    });
+  }
+};
+
 
 
 

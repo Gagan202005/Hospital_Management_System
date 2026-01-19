@@ -6,7 +6,7 @@ const { uploadImageToCloudinary } = require("../utils/imageUploader");
 exports.updateDisplayPicture = async (req, res) => {
 	try {
 
-		const id = req.user.id;
+	const id = req.user.id;
 	const accountType = req.user.accountType;
 
 	const UserModel = accountType === "Patient" ? Patient : accountType === "Doctor" ? Doctor : Admin;
@@ -29,7 +29,7 @@ exports.updateDisplayPicture = async (req, res) => {
 		image,
 		process.env.FOLDER_NAME
 	);
-	console.log(uploadDetails);
+	// console.log(uploadDetails);
 
 	const updatedImage = await UserModel.findByIdAndUpdate(
 		{ _id: id },

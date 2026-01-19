@@ -10,8 +10,8 @@ import { Badge } from "../../ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { useToast } from "../../../hooks/use-toast";
 import { useDispatch, useSelector } from "react-redux";
-import { UpdatePfp } from "../../../services/operations/profileApi";
-import { updateprofile } from "../../../services/operations/profileApi";
+import { UpdatePfp } from "../../../services/operations/PatientApi";
+import { updateprofile } from "../../../services/operations/PatientApi";
 
 export default function PatientProfileSection() {
   const dispatch = useDispatch();

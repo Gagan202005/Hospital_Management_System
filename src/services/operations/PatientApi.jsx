@@ -4,12 +4,10 @@ import { setUser } from "../../Slices/profileslice"
 import { profendpoints } from "../api"
 import {apiConnector} from "../apiConnector"
 import {setProgress} from "../../Slices/loadingbarslice"
-import { useSelector } from "react-redux"
+
 const {
   PATIENT_EDITPROFILE_API,
   PATIENT_UPDATEDISPLAYPICTURE_API,
-  DOCTOR_UPDATEDISPLAYPICTURE_API,
-  ADMIN_UPDATEDISPLAYPICTURE_API,
 } = profendpoints
 
 export async function updateprofile(profile,token,dispatch){
@@ -54,13 +52,6 @@ export async function UpdatePfp(token,pfp,accountType,dispatch){
     const formData = new FormData();
     console.log("pfp",pfp)
     formData.append('pfp',pfp);
-    // const response =(accountType ==="Patient" ?   await apiConnector("POST", PATIENT_UPDATEDISPLAYPICTURE_API,formData,{
-    //   Authorisation: `Bearer ${token}`
-    // }) : accountType ==="Doctor" ?  await apiConnector("POST", DOCTOR_UPDATEDISPLAYPICTURE_API,formData,{
-    //   Authorisation: `Bearer ${token}`
-    // }) : await apiConnector("POST", ADMIN_UPDATEDISPLAYPICTURE_API,formData,{
-    //   Authorisation: `Bearer ${token}`
-    // }) );
     const response = await apiConnector("POST", PATIENT_UPDATEDISPLAYPICTURE_API, formData, {
       Authorization: `Bearer ${token}`
     });
