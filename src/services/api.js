@@ -37,4 +37,11 @@ export const Doctorendpoints = {
   GET_DOCTOR_PROFILE_API : BASE_URL + "/Doctor/getDoctorDetails",
   UPDATE_DOCTOR_IMAGE_API : BASE_URL + "/Doctor/updateDisplayPicture",
   UPDATE_DOCTOR_PROFILE_API : BASE_URL + "/Doctor/editprofile",
+  GET_PUBLIC_DOCTORS_API : BASE_URL + "/Doctor/public/search",
+  GET_DOCTOR_DETAILS_API : BASE_URL + "/doctor/public/profile",
+}
+
+export const AppointmentEndpoints = {
+  GET_DOCTOR_SLOTS_API : BASE_URL + "/appointment/slots",
+  BOOK_APPOINTMENT_API : BASE_URL + "/appointment/book",
 }

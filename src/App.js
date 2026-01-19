@@ -13,6 +13,9 @@ import PrivateRoute from './Components/Common/Privateroute.jsx';
 import DoctorDashboard from './Pages/DoctorDashboard';
 import PatientDashboard from './Pages/PatientDashboard';
 import AdminDashboard from './Pages/AdminDashboard';
+import FindDoctor from './Pages/FindDoctor.jsx';
+import DoctorProfile from './Components/Core/FindDoctor/DoctorProfile.jsx';
+import BookAppointment from './Components/Core/FindDoctor/BookAppointmentSection.jsx';
 import { Toaster } from './Components/ui/toaster';
 function App() {
   const user = useSelector((state) => state.profile.user);
@@ -38,6 +41,9 @@ function App() {
         <Route path="/doctor-dashboard/*" element={<PrivateRoute><NavBar setProgress={setProgress}></NavBar><DoctorDashboard /></PrivateRoute>} />
         <Route path="/patient-dashboard/*" element={<PrivateRoute><><NavBar setProgress={setProgress}></NavBar><PatientDashboard /></></PrivateRoute>} />
         <Route path="/admin-dashboard" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
+        <Route path="/find-doctor" element={<FindDoctor />} />
+        <Route path="/doctor/:id" element={<DoctorProfile />} />
+        <Route path="/doctor/:id/book" element={<BookAppointment />} />
       </Routes>
       <Toaster />
     </div>

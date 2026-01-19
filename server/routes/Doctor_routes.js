@@ -7,7 +7,7 @@ const {
 } = require("../middlewares/auth");
 const {isDemo} = require("../middlewares/demo");
 const {
-  makingreport,updateDoctorProfile
+  makingreport,updateDoctorProfile,getPublicDoctors,getDoctorDetails
 } = require("../controllers/Doctorcontroller")
 const {updateDisplayPicture} = require("../controllers/Common")
 const { 
@@ -30,5 +30,11 @@ router.post("/MakingReport",auth,isDoctor,isDemo,makingreport);
 router.get("/getDoctorDetails",auth,isDoctor,getalluserdetails);
 router.put("/editprofile",auth,isDemo,isDoctor,updateDoctorProfile);
 router.put("/updateDisplayPicture",auth,isDemo,isDoctor,updateDisplayPicture);
+
+// Public route - No auth middleware needed for searching doctors
+router.get("/public/search", getPublicDoctors);
+router.get("/public/profile/:id", getDoctorDetails);
+
+
 module.exports = router;
 

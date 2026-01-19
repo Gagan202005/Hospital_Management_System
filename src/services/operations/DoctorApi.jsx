@@ -2,12 +2,13 @@ import { apiConnector } from "../apiConnector";
 import { toast } from "../../hooks/use-toast";
 import { Doctorendpoints } from "../api";
 import { setLoading, setUser } from "../../Slices/profileslice"; // Adjust path to your slice
-
-const { 
-  GET_DOCTOR_PROFILE_API, 
+const {
   UPDATE_DOCTOR_PROFILE_API, 
-  UPDATE_DOCTOR_IMAGE_API // Ensure this exists in your API endpoints
+  UPDATE_DOCTOR_IMAGE_API, // Ensure this exists in your API endpoints
+  GET_PUBLIC_DOCTORS_API,GET_DOCTOR_DETAILS_API,
 } = Doctorendpoints;
+
+
 const { ADD_TIME_SLOT_API, FETCH_TIME_SLOTS_API, DELETE_TIME_SLOT_API } = Doctorendpoints;
 
 // --- FETCH SLOTS ---
@@ -205,3 +206,56 @@ export async function updateDoctorPfp(token, pfp, dispatch, toast) {
     });
   }
 }
+
+
+export const fetchPublicDoctors = async (searchQuery = "", specialty = "") => {
+  let result = [];
+  try {
+    // Construct Query Params
+    const params = {};
+    if (searchQuery) params.searchQuery = searchQuery;
+    if (specialty) params.specialty = specialty;
+
+    const response = await apiConnector(
+      "GET",
+      GET_PUBLIC_DOCTORS_API,
+      null,
+      null, // No headers needed for public route usually
+      params // Pass params to axios
+    );
+    console.log(response);
+    if (!response?.data?.success) {
+      throw new Error(response?.data?.message || "Could not fetch doctors");
+    }
+
+    result = response.data.data;
+  } catch (error) {
+    console.log("FETCH_PUBLIC_DOCTORS_ERROR:", error);
+    // Don't toast error on search typing, just log it
+  }
+  return result;
+};
+
+
+export const fetchDoctorDetails = async (doctorId) => {
+  let result = null;
+  try {
+    // Construct the URL with the ID
+    const response = await apiConnector(
+      "GET",
+      `${GET_DOCTOR_DETAILS_API}/${doctorId}`,
+      null,
+      null
+    );
+
+    if (!response?.data?.success) {
+      throw new Error(response?.data?.message || "Could not fetch doctor details");
+    }
+
+    result = response.data.data;
+  } catch (error) {
+    console.log("FETCH_DOCTOR_DETAILS_ERROR:", error);
+    // Optional: toast.error("Failed to load doctor details");
+  }
+  return result;
+};

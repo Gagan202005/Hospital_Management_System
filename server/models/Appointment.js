@@ -1,29 +1,50 @@
 const mongoose = require("mongoose");
 
-const appointmentschema = new mongoose.Schema(
-    {
-    patient :{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Patient",
+const appointmentSchema = new mongoose.Schema(
+  {
+    patient: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Patient", 
+      default: null,
     },
-    doctor:{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Doctor",
+    patientDetails: {
+      firstName: { type: String, required: true },
+      lastName: { type: String },
+      email: { type: String, required: true },
+      phone: { type: String, required: true },
     },
-    date:{
-        type: Date,
-        required:true,
+    doctor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Doctor",
+      required: true,
     },
-    time:{
-        type:String,
-        required:true,
+    date: {
+      type: Date,
+      required: true,
     },
-    disease:{
-        type:String,
-        required:true,
-    }
-},
-{ timestamps: true },
+    
+    // --- CHANGED: Link to specific TimeSlot ID ---
+    timeSlotId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TimeSlot",
+      required: true,
+    },
+    
+    // We still keep the string for easy reading in admin panels
+    timeSlot: {
+      type: String, 
+      required: true,
+    },
+
+    reason: { type: String, required: true },
+    symptoms: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["Pending", "Scheduled", "Completed", "Cancelled"],
+      default: "Scheduled",
+    },
+  },
+  { timestamps: true }
 );
 
-module.exports =mongoose.model("Appointment", appointmentschema);
+module.exports = mongoose.model("Appointment", appointmentSchema);

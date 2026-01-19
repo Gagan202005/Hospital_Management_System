@@ -5,7 +5,7 @@ export const NavbarLinks = [
   },
   {
     title: "Find Doctor",
-    path : "/find_doctor",
+    path : "/find-doctor",
   },
   {
     title: "About Us",

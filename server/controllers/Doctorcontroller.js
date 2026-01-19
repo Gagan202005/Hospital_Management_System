@@ -1,21 +1,22 @@
-const Patient = require("../models/Patient");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const Doctor = require("../models/Doctor");
 const Appointment = require("../models/Appointment");
-const TimeSlot = require("../models/Slot");
+const TimeSlot = require("../models/Slot"); // Ensure filename matches your model (e.g., TimeSlot.js)
+const Patient = require("../models/Patient"); // Kept if you plan to use it later
+
+// =================================================================
+// 1. DOCTOR PROFILE MANAGEMENT
+// =================================================================
 
 exports.updateDoctorProfile = async (req, res) => {
   try {
-    // 1. Get Doctor ID from authenticated request (Middleware)
-    // We assume your auth middleware puts the doctor's _id into req.user.id
+    // 1. Get Doctor ID from authenticated request
     const doctorId = req.user.id;
 
     // 2. Get data from body
     const {
       firstName,
       lastName,
-      phoneno,    // Matches schema field 'phoneno'
+      phoneno,
       dob,
       age,
       gender,
@@ -29,7 +30,7 @@ exports.updateDoctorProfile = async (req, res) => {
       qualification // Expected to be an array of objects
     } = req.body;
 
-    // 3. Find the Doctor by ID
+    // 3. Find the Doctor
     const doctor = await Doctor.findById(doctorId);
 
     if (!doctor) {
@@ -39,10 +40,7 @@ exports.updateDoctorProfile = async (req, res) => {
       });
     }
 
-    // 4. Update Fields
-    // We update fields only if they are provided in the request body.
-    // This allows partial updates (e.g., updating just the fee).
-    
+    // 4. Update Fields (only if provided)
     if (firstName) doctor.firstName = firstName;
     if (lastName) doctor.lastName = lastName;
     if (phoneno) doctor.phoneno = phoneno;
@@ -58,26 +56,22 @@ exports.updateDoctorProfile = async (req, res) => {
     if (consultationFee !== undefined) doctor.consultationFee = consultationFee;
     if (about) doctor.about = about;
 
-    // Update Qualifications
-    // If sent, we replace the entire array. Ensure frontend sends the full list.
+    // Update Qualifications: Replace entire array if provided
     if (qualification && Array.isArray(qualification)) {
       doctor.qualification = qualification;
     }
 
-    // 5. Save the updated document
+    // 5. Save updates
     await doctor.save();
 
-    // 6. Return Response
-    // We return the updated doctor object so Redux can update the UI immediately
-    
-    // Safety: Exclude password/token from response
+    // 6. Return Response (exclude sensitive data)
     doctor.password = undefined;
     doctor.token = undefined;
 
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
-      data: doctor, // The updated doctor object
+      data: doctor,
     });
 
   } catch (error) {
@@ -90,29 +84,33 @@ exports.updateDoctorProfile = async (req, res) => {
   }
 };
 
-
-exports.makingreport = async (req,res) => {
-    try{
-        const {doctor} = req.doctor;
-        const {email,name,disease,suggestions,test_report,medicines} = req.body;
-    }
-    catch(err){
+exports.makingreport = async (req, res) => {
+    try {
+        // Logic for making report goes here
+        // Example placeholder:
+        // const { email, name, disease, suggestions, test_report, medicines } = req.body;
+        // ... logic ...
+        return res.status(200).json({
+            success: true,
+            message: "Report logic placeholder"
+        });
+    } catch (err) {
         return res.status(500).json({
-            success : false,
-            error : err,
+            success: false,
+            error: err.message,
         });
     }
-}
+};
 
+
+// =================================================================
+// 2. TIME SLOT MANAGEMENT (Doctor Dashboard)
+// =================================================================
 
 // --- CREATE TIME SLOT ---
 exports.createTimeSlot = async (req, res) => {
   try {
-    // 1. Get data from body
-    // Note: We ignore 'token' here because Middleware should handle authentication
     const { date, startTime, endTime } = req.body;
-
-    // 2. Get Doctor ID from the authenticated user (Middleware)
     const doctorId = req.user.id; 
 
     if (!date || !startTime || !endTime) {
@@ -122,8 +120,6 @@ exports.createTimeSlot = async (req, res) => {
       });
     }
 
-    // 3. Create the slot
-    // The Schema's pre('save') hook will automatically check for overlaps!
     const newSlot = await TimeSlot.create({
       doctorId,
       date,
@@ -140,15 +136,13 @@ exports.createTimeSlot = async (req, res) => {
 
   } catch (error) {
     console.error("CREATE_SLOT_ERROR:", error);
-
-    // Check if the error is the Overlap Error thrown by our Schema
+    // Handle specific overlap error from Schema validation
     if (error.message.includes("overlaps")) {
-      return res.status(409).json({ // 409 Conflict
+      return res.status(409).json({ 
         success: false,
         message: "This time slot overlaps with an existing slot.",
       });
     }
-
     return res.status(500).json({
       success: false,
       message: "Failed to create time slot",
@@ -160,9 +154,8 @@ exports.createTimeSlot = async (req, res) => {
 // --- GET TIME SLOTS ---
 exports.getTimeSlots = async (req, res) => {
   try {
-    const doctorId = req.user.id; // From Middleware
+    const doctorId = req.user.id; 
 
-    // Fetch slots and sort by Date (ascending) then Start Time (ascending)
     const slots = await TimeSlot.find({ doctorId })
       .sort({ date: 1, startTime: 1 });
 
@@ -184,9 +177,6 @@ exports.getTimeSlots = async (req, res) => {
 // --- DELETE TIME SLOT ---
 exports.deleteTimeSlot = async (req, res) => {
   try {
-    // We expect the ID to be passed in the Body or Params
-    // Based on your frontend code, you likely need to send it in the body 
-    // OR append it to the URL. I will support receiving it via body for this example.
     const { slotId } = req.body; 
 
     if (!slotId) {
@@ -196,16 +186,15 @@ exports.deleteTimeSlot = async (req, res) => {
       });
     }
 
-    // Find and delete, ensuring the slot belongs to this doctor
     const deletedSlot = await TimeSlot.findOneAndDelete({
       _id: slotId,
-      doctorId: req.user.id, // Security: Prevent deleting other doctors' slots
+      doctorId: req.user.id, // Ensure ownership
     });
 
     if (!deletedSlot) {
       return res.status(404).json({
         success: false,
-        message: "Slot not found or you are not authorized to delete it",
+        message: "Slot not found or unauthorized",
       });
     }
 
@@ -221,5 +210,189 @@ exports.deleteTimeSlot = async (req, res) => {
       message: "Failed to delete time slot",
       error: error.message,
     });
+  }
+};
+
+
+// =================================================================
+// 3. PUBLIC SEARCH & DETAILS (Patient View)
+// =================================================================
+
+exports.getPublicDoctors = async (req, res) => {
+  try {
+    const { searchQuery, specialty } = req.query;
+
+    let query = { 
+      status: "Active", 
+      active: true 
+    };
+
+    // 1. Handle Search Text
+    if (searchQuery) {
+      const regex = new RegExp(searchQuery, "i");
+      query.$or = [
+        { firstName: regex },
+        { lastName: regex },
+        { specialization: regex },
+        { department: regex }
+      ];
+    }
+
+    // 2. Handle Specialty Filter
+    if (specialty && specialty !== "All specialties") {
+      query.specialization = specialty;
+    }
+
+    // 3. Fetch Doctors
+    let doctors = await Doctor.find(query)
+      .select("firstName lastName specialization image experience qualification phoneno consultationFee doctorID rating")
+      .lean();
+
+    // 4. Sort by Experience (Highest First)
+    doctors.sort((a, b) => {
+      const expA = parseInt(a.experience) || 0;
+      const expB = parseInt(b.experience) || 0;
+      return expB - expA;
+    });
+
+    // 5. Initial View Limit
+    if (!searchQuery && (!specialty || specialty === "All specialties")) {
+      doctors = doctors.slice(0, 8);
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: doctors.length,
+      data: doctors,
+    });
+
+  } catch (error) {
+    console.error("GET_PUBLIC_DOCTORS_ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch doctors",
+    });
+  }
+};
+
+exports.getDoctorDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const doctor = await Doctor.findById(id)
+      .select("-password -token -resetPasswordExpires")
+      .lean();
+
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: "Doctor not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: doctor,
+    });
+
+  } catch (error) {
+    console.error("GET_DOCTOR_DETAILS_ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Invalid Doctor ID format",
+    });
+  }
+};
+
+
+// =================================================================
+// 4. APPOINTMENT BOOKING (Slot Based)
+// =================================================================
+
+// --- Get Available Slots (Public/Patient) ---
+exports.getAvailableSlots = async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    const { date } = req.query; // Format: YYYY-MM-DD
+
+    if (!date || !doctorId) {
+      return res.status(400).json({ success: false, message: "Date and Doctor ID required" });
+    }
+
+    // Normalize date to UTC Midnight to match TimeSlot storage
+    const queryDate = new Date(date);
+    queryDate.setUTCHours(0, 0, 0, 0);
+
+    // Fetch slots that are NOT booked
+    const availableSlots = await TimeSlot.find({
+      doctorId: doctorId,
+      date: queryDate,
+      isBooked: false 
+    })
+    .sort({ startTime: 1 })
+    .select("startTime _id");
+
+    return res.status(200).json({
+      success: true,
+      data: availableSlots
+    });
+
+  } catch (error) {
+    console.error("GET_SLOTS_ERROR:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch slots" });
+  }
+};
+
+// --- Book Appointment (Public/Patient) ---
+exports.bookAppointment = async (req, res) => {
+  try {
+    const { 
+      doctorId, date, timeSlotId, 
+      firstName, lastName, email, phone, reason, symptoms 
+    } = req.body;
+
+    // 1. Check for Logged-In User
+    // If auth middleware ran and token is valid, req.user will exist.
+    // If not (guest), patientId will be null.
+    const patientId = req.user ? req.user.id : null;
+
+    // 2. Verify the Slot exists and is free
+    const slotDoc = await TimeSlot.findById(timeSlotId);
+
+    if (!slotDoc) {
+      return res.status(404).json({ success: false, message: "Time slot not found" });
+    }
+
+    if (slotDoc.isBooked) {
+      return res.status(400).json({ success: false, message: "This slot is already booked" });
+    }
+
+    // 3. Create the Appointment
+    const newAppointment = await Appointment.create({
+      doctor: doctorId,
+      patient: patientId, // <--- LINK PATIENT ID HERE
+      patientDetails: { firstName, lastName, email, phone },
+      date: slotDoc.date,
+      timeSlotId: slotDoc._id,
+      timeSlot: slotDoc.startTime,
+      reason,
+      symptoms,
+      status: "Scheduled"
+    });
+
+    // 4. Mark the TimeSlot as Booked
+    slotDoc.isBooked = true;
+    slotDoc.appointmentId = newAppointment._id;
+    await slotDoc.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Appointment booked successfully",
+      data: newAppointment
+    });
+
+  } catch (error) {
+    console.error("BOOK_APPOINTMENT_ERROR:", error);
+    return res.status(500).json({ success: false, message: "Booking failed" });
   }
 };

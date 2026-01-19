@@ -2,6 +2,8 @@ const Patient = require("../models/Patient");
 const Doctor = require("../models/Doctor");
 const Admin = require("../models/Admin");
 const { uploadImageToCloudinary } = require("../utils/imageUploader");
+
+
 //updateDisplayPicture
 exports.updateDisplayPicture = async (req, res) => {
 	try {
