@@ -533,3 +533,64 @@ exports.updateAppointmentStatus = async (req, res) => {
     });
   }
 };
+
+
+exports.getDoctorDashboardStats = async (req, res) => {
+  try {
+    const doctorId = req.user.id;
+
+    // 1. Get Doctor Details (for name)
+    const doctor = await Doctor.findById(doctorId).select("firstName lastName");
+
+    // 2. Define Time Ranges
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // 3. Count Today's Appointments
+    const todayAppointmentsCount = await Appointment.countDocuments({
+      doctor: doctorId,
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: "Cancelled" } // Exclude cancelled
+    });
+
+    // 4. Count Total Unique Patients
+    // We get all distinct patient IDs from appointments associated with this doctor
+    const uniquePatients = await Appointment.distinct("patient", {
+      doctor: doctorId
+    });
+    const totalPatientsCount = uniquePatients.length;
+
+    // 5. Count Total Completed Appointments (Lifetime)
+    const totalCompletedCount = await Appointment.countDocuments({
+      doctor: doctorId,
+      status: "Completed"
+    });
+
+    // 6. Get Recent/Upcoming Activity (Next 3 Appointments)
+    const recentAppointments = await Appointment.find({
+        doctor: doctorId,
+        status: "Scheduled",
+        date: { $gte: new Date() } // Future dates only
+    })
+    .sort({ date: 1, timeSlot: 1 }) // Earliest first
+    .limit(3)
+    .populate("patientDetails", "firstName lastName");
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        doctorName: `${doctor.firstName} ${doctor.lastName}`,
+        todayCount: todayAppointmentsCount,
+        totalPatients: totalPatientsCount,
+        totalCompleted: totalCompletedCount,
+        recentActivity: recentAppointments
+      }
+    });
+
+  } catch (error) {
+    console.error("DASHBOARD_STATS_ERROR", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch dashboard stats" });
+  }
+};

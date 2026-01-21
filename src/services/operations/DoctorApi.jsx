@@ -1,5 +1,7 @@
 import { apiConnector } from "../apiConnector";
-import { toast } from "../../hooks/use-toast";
+// import { toast } from "../../hooks/use-toast";
+// ✅ Use the library directly for API files
+import { toast } from "react-hot-toast";
 import { Doctorendpoints } from "../api";
 import { setLoading, setUser } from "../../Slices/profileslice"; // Adjust path to your slice
 const {
@@ -9,7 +11,8 @@ const {
   GET_DOCTOR_APPOINTMENTS_API, 
   UPDATE_APPOINTMENT_STATUS_API, 
   BOOK_APPOINTMENT_API,
-  ADD_TIME_SLOT_API, DELETE_TIME_SLOT_API,GET_DOCTOR_SLOTS_API,FETCH_TIME_SLOTS_API
+  ADD_TIME_SLOT_API, DELETE_TIME_SLOT_API,GET_DOCTOR_SLOTS_API,FETCH_TIME_SLOTS_API,
+  GET_DASHBOARD_STATS_API
 } = Doctorendpoints;
 
 
@@ -372,4 +375,26 @@ export const fetchTimeSlotsbyDate = async (doctorId, date) => {
     // Silent fail or toast depending on preference
   }
   return result;
+};
+
+
+
+export const fetchDashboardStats = async (token) => {
+  try {
+    const response = await apiConnector(
+      "GET",
+      GET_DASHBOARD_STATS_API,
+      null,
+      { Authorization: `Bearer ${token}` }
+    );
+
+    if (!response.data.success) {
+      throw new Error(response.data.message);
+    }
+    return response.data.data;
+  } catch (error) {
+    console.error("FETCH_STATS_ERROR", error);
+    toast.error("Could not load dashboard data");
+    return null;
+  }
 };

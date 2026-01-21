@@ -7,7 +7,7 @@ const Doctor = require("../models/Doctor");
 const Appointment = require("../models/Appointment");
 const {instance} = require("../config/razorpay");
 const crypto = require("crypto");
-const Report = require("../models/Medicalrecord")
+const MedicalRecord = require("../models/Medicalrecord")
 require("dotenv").config();
 const {uploadImageToCloudinary} = require("../utils/imageUploader");
 // Signup Controller for Registering USers
@@ -279,7 +279,7 @@ exports.getallreports = async (req,res) => {
                 message:"patient id is missing",
             });
         }
-        const reports = await Report.find({patient:patientID}).populate("doctor");
+        const reports = await MedicalRecord.find({patient:patientID}).populate("doctor");
         return res.status(200).json({
             success:true,
             message:"data fetched successfully",
@@ -329,4 +329,92 @@ exports.editprofile = async (req, res) => {
 			error: error.message,
 		});
 	}
+};
+
+
+
+exports.getPatientAppointments = async (req, res) => {
+  try {
+    const patientId = req.user.id; // From Auth Middleware
+
+    // Fetch appointments and populate Doctor details
+    const appointments = await Appointment.find({ patient: patientId })
+      .populate("doctor", "firstName lastName image email") // Get Doctor info
+      .sort({ date: 1 }); // Sort by date ascending
+
+    return res.status(200).json({
+      success: true,
+      data: appointments,
+    });
+  } catch (error) {
+    console.error("GET_PATIENT_APPOINTMENTS_ERROR", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch appointments",
+    });
+  }
+};
+
+exports.getPatientDashboardStats = async (req, res) => {
+  try {
+    const patientId = req.user.id;
+
+    // 1. Patient Details
+    const patient = await Patient.findById(patientId).select("firstName lastName");
+
+    // 2. Counts
+    const upcomingCount = await Appointment.countDocuments({
+      patient: patientId,
+      status: { $in: ["Scheduled", "Confirmed"] },
+      date: { $gte: new Date() }
+    });
+
+    // 3. Last Visit (Completed Appointment)
+    const lastAppointment = await Appointment.findOne({
+      patient: patientId,
+      status: "Completed"
+    }).sort({ date: -1 });
+
+    // 4. Next Upcoming Appointment (Specific details)
+    const nextAppointment = await Appointment.findOne({
+      patient: patientId,
+      status: { $in: ["Scheduled", "Confirmed"] },
+      date: { $gte: new Date() }
+    })
+    .sort({ date: 1 })
+    .populate("doctor", "firstName lastName");
+
+    // 5. Latest Medical Records (Limit 3)
+    const recentReports = await MedicalRecord.find({ patient: patientId })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .populate("doctor", "firstName lastName");
+
+    // 6. Latest Vitals (from the most recent report)
+    const latestVitals = recentReports.length > 0 ? recentReports[0].vitalSigns : null;
+
+    // Calculate "Days Ago" for last visit
+    let daysAgo = "Never";
+    if (lastAppointment) {
+        const diffTime = Math.abs(new Date() - new Date(lastAppointment.date));
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        daysAgo = `${diffDays} days ago`;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        patientName: `${patient.firstName} ${patient.lastName}`,
+        upcomingCount,
+        lastVisit: daysAgo,
+        nextAppointment,
+        latestVitals,
+        recentReports
+      }
+    });
+
+  } catch (error) {
+    console.error("PATIENT_DASHBOARD_ERROR", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch dashboard data" });
+  }
 };

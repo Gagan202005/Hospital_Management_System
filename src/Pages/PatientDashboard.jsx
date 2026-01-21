@@ -3,7 +3,6 @@ import PatientSidebar  from "../Components/Core/Patient/PatientSidebar";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import  PatientAppointmentsSection  from "../Components/Core/Patient/PatientAppointmentSection";
 import  PatientProfileSection  from "../Components/Core/Patient/PatientProfileSection";
-import  PatientReportsSection  from "../Components/Core/Patient/PatientReportsSection";
 import PatientOverview from "../Components/Core/Patient/PatientOverview";
 import { useDispatch, useSelector } from "react-redux"
 import { useNavigate } from "react-router-dom"
@@ -39,7 +38,6 @@ const PatientDashboard = () => {
             <Route path="/" element={<Navigate to="/patient-dashboard/overview" replace />} />
             <Route path="/overview" element={<PatientOverview />} />
             <Route path="/appointments" element={<PatientAppointmentsSection />} />
-            <Route path="/reports" element={<PatientReportsSection />} />
             <Route path="/profile" element={<PatientProfileSection />} />
           </Routes>
         </main>

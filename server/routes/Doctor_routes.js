@@ -8,7 +8,7 @@ const {
 const {isDemo} = require("../middlewares/demo");
 const {
   updateDoctorProfile,getPublicDoctors,getDoctorDetails,getDoctorPatients,getDoctorAppointments,updateAppointmentStatus,bookAppointment, 
-  getAvailableSlots 
+  getAvailableSlots ,getDoctorDashboardStats
 } = require("../controllers/Doctorcontroller")
 const {updateDisplayPicture} = require("../controllers/Common")
 const { 
@@ -56,3 +56,5 @@ router.post("/book", bookAppointment);
 
 module.exports = router;
 
+
+router.get("/dashboard-stats", auth, isDoctor, getDoctorDashboardStats);

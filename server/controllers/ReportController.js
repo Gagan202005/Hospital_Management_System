@@ -1,64 +1,64 @@
 const MedicalRecord = require("../models/Medicalrecord");
 const Appointment = require("../models/Appointment");
+const Doctor = require("../models/Doctor"); 
+const Patient = require("../models/Patient");
+const { uploadImageToCloudinary } = require("../utils/imageUploader");
 
-// =================================================================
-// CREATE VISIT REPORT (Complete Appointment)
-// =================================================================
+// ... createVisitReport remains the same ...
 exports.createVisitReport = async (req, res) => {
   try {
-    // 1. Destructure Data from Request Body
     const { 
-      appointmentId, 
-      diagnosis, 
-      symptoms, 
-      bp, 
-      weight, 
-      temperature, 
-      spo2,       
-      heartRate,
-      doctorNotes,
-      patientAdvice, // Optional, can be part of doctorNotes or separate
-      prescription   // Expecting an array of medicine objects
+      appointmentId, diagnosis, symptoms, bp, weight, 
+      temperature, spo2, heartRate, doctorNotes, patientAdvice 
     } = req.body;
 
-    const doctorId = req.user.id; // From Auth Middleware
+    const doctorId = req.user.id; 
 
-    // 2. Validate Appointment
+    // Handle Prescription
+    let prescription = [];
+    if (req.body.prescription) {
+        prescription = typeof req.body.prescription === 'string' 
+            ? JSON.parse(req.body.prescription) 
+            : req.body.prescription;
+    }
+
+    // Handle Files
+    let labReports = [];
+    if (req.files && req.files.labReports) {
+        const files = Array.isArray(req.files.labReports) ? req.files.labReports : [req.files.labReports];
+        
+        for (const file of files) {
+            const uploadedFile = await uploadImageToCloudinary(file, "LabReports");
+            labReports.push({
+                originalName: file.name,
+                url: uploadedFile.secure_url
+            });
+        }
+    }
+
     const appointment = await Appointment.findById(appointmentId);
     if (!appointment) {
       return res.status(404).json({ success: false, message: "Appointment not found" });
     }
 
-    // 3. Create Medical Record
     const newRecord = await MedicalRecord.create({
       appointmentId,
       doctor: doctorId,
-      patient: appointment.patient || null, // Link to User ID if logged in
-      
-      // Save snapshot of patient details (Immutable record)
+      patient: appointment.patient || null,
       patientDetails: {
           name: `${appointment.patientDetails.firstName} ${appointment.patientDetails.lastName}`,
           email: appointment.patientDetails.email,
           phone: appointment.patientDetails.phone
       },
-      
       diagnosis,
       symptoms,
-      
-      // Group Vitals
-      vitalSigns: { 
-        bp, 
-        weight, 
-        temperature,
-        spo2,       // Optional based on your schema
-        heartRate   // Optional based on your schema
-      },
-      
+      vitalSigns: { bp, weight, temperature, spo2, heartRate },
       doctorNotes,
-      prescription: prescription || []
+      patientAdvice,
+      prescription,
+      labReports
     });
 
-    // 4. Mark Appointment as Completed
     appointment.status = "Completed";
     await appointment.save();
 
@@ -70,40 +70,100 @@ exports.createVisitReport = async (req, res) => {
 
   } catch (error) {
     console.error("CREATE_REPORT_ERROR:", error);
-    
-    // Handle Duplicate Key Error (If report already exists for this appointment)
-    if (error.code === 11000) {
-       return res.status(400).json({
-         success: false,
-         message: "A report already exists for this appointment."
-       });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create report",
-      error: error.message
-    });
+    return res.status(500).json({ success: false, message: "Failed to create report", error: error.message });
   }
 };
 
-// =================================================================
-// GET REPORT BY APPOINTMENT ID (For Viewing Later)
-// =================================================================
+
+// UPDATE REPORT
+exports.updateVisitReport = async (req, res) => {
+    try {
+        const { 
+            reportId, diagnosis, symptoms, bp, weight, 
+            temperature, spo2, heartRate, doctorNotes, patientAdvice,
+            deletedLabReports
+        } = req.body;
+
+        const record = await MedicalRecord.findById(reportId);
+        if (!record) {
+            return res.status(404).json({ success: false, message: "Report not found" });
+        }
+
+        if (!record.labReports) record.labReports = [];
+
+        // 1. Handle Deletions
+        if (deletedLabReports) {
+            const filesToDelete = JSON.parse(deletedLabReports);
+            if (filesToDelete.length > 0) {
+                record.labReports = record.labReports.filter(
+                    file => !filesToDelete.includes(file.url)
+                );
+            }
+        }
+
+        // 2. Handle New Uploads
+        if (req.files && req.files.labReports) {
+            const files = Array.isArray(req.files.labReports) ? req.files.labReports : [req.files.labReports];
+            for (const file of files) {
+                const uploadedFile = await uploadImageToCloudinary(file, "LabReports");
+                record.labReports.push({
+                    originalName: file.name,
+                    url: uploadedFile.secure_url
+                });
+            }
+        }
+
+        // 3. Update Text Fields (FIXED LOGIC)
+        // Check !== undefined ensures we can save empty strings (clearing the field)
+        if (diagnosis !== undefined) record.diagnosis = diagnosis;
+        if (symptoms !== undefined) record.symptoms = symptoms;
+        if (doctorNotes !== undefined) record.doctorNotes = doctorNotes;
+        if (patientAdvice !== undefined) record.patientAdvice = patientAdvice;
+
+        // 4. Update Vitals
+        // We use || record... only if the value is strictly undefined, otherwise we accept empty strings to clear vitals
+        record.vitalSigns = {
+            bp: bp !== undefined ? bp : record.vitalSigns?.bp,
+            weight: weight !== undefined ? weight : record.vitalSigns?.weight,
+            temperature: temperature !== undefined ? temperature : record.vitalSigns?.temperature,
+            spo2: spo2 !== undefined ? spo2 : record.vitalSigns?.spo2,
+            heartRate: heartRate !== undefined ? heartRate : record.vitalSigns?.heartRate,
+        };
+
+        // 5. Update Prescription
+        if (req.body.prescription) {
+             const parsedPrescription = typeof req.body.prescription === 'string' 
+                ? JSON.parse(req.body.prescription) 
+                : req.body.prescription;
+             record.prescription = parsedPrescription;
+        }
+
+        await record.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Report updated successfully",
+            data: record
+        });
+
+    } catch (error) {
+        console.error("UPDATE_REPORT_ERROR", error);
+        return res.status(500).json({ success: false, message: "Failed to update report" });
+    }
+};
+
+// ... getReportByAppointment remains the same ...
 exports.getReportByAppointment = async (req, res) => {
     try {
         const { appointmentId } = req.params;
-        
         const report = await MedicalRecord.findOne({ appointmentId })
             .populate("appointmentId")
-            .populate("doctor", "firstName lastName");
+            .populate("doctor", "firstName lastName"); 
 
         if(!report) {
             return res.status(404).json({ success: false, message: "No report found for this appointment"});
         }
-
         return res.status(200).json({ success: true, data: report });
-
     } catch (error) {
         console.error("GET_REPORT_ERROR:", error);
         return res.status(500).json({ success: false, message: "Error fetching report" });

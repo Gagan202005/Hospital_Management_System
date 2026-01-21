@@ -13,12 +13,6 @@ export const patientsidebardata = [
       path: "/patient-dashboard/appointments",
     },
     {
-      title: "Medical Reports",
-      icon: FileText,
-      section: "reports",
-      path: "/patient-dashboard/reports",
-    },
-    {
       title: "Profile",
       icon: User,
       section: "profile",

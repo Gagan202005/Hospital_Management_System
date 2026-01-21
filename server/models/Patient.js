@@ -99,7 +99,7 @@ const patientschema = new mongoose.Schema(
         // Medical Records - Defaults to empty arrays
         reports: [{
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Report",
+            ref: "MedicalRecord",
         }],
         myappointments: [{
             type: mongoose.Schema.Types.ObjectId,

@@ -7,7 +7,7 @@ import {setProgress} from "../../Slices/loadingbarslice"
 
 const {
   PATIENT_EDITPROFILE_API,
-  PATIENT_UPDATEDISPLAYPICTURE_API,
+  PATIENT_UPDATEDISPLAYPICTURE_API,PATIENT_APPOINTMENTS_API,GET_PATIENT_DASHBOARD_API
 } = profendpoints
 
 export async function updateprofile(profile,token,dispatch){
@@ -70,3 +70,45 @@ export async function UpdatePfp(token,pfp,accountType,dispatch){
   }
   toast.dismiss(toastId);
 }
+
+
+export const fetchPatientAppointments = async (token) => {
+  try {
+    const response = await apiConnector(
+      "GET",
+      PATIENT_APPOINTMENTS_API,
+      null,
+      { Authorization: `Bearer ${token}` }
+    );
+
+    if (!response.data.success) {
+      throw new Error(response.data.message);
+    }
+    return response.data.data;
+  } catch (error) {
+    console.error("FETCH_PATIENT_APPT_ERROR", error);
+    toast.error("Could not load appointments");
+    return [];
+  }
+};
+
+
+export const fetchPatientDashboardStats = async (token) => {
+  try {
+    const response = await apiConnector(
+      "GET",
+      GET_PATIENT_DASHBOARD_API, // Ensure this URL is defined
+      null,
+      { Authorization: `Bearer ${token}` }
+    );
+    console.log(response);
+    if (!response.data.success) {
+      throw new Error(response.data.message);
+    }
+    return response.data.data;
+  } catch (error) {
+    console.error("FETCH_DASHBOARD_ERROR", error);
+    toast.error("Could not load dashboard");
+    return null;
+  }
+};

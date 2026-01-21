@@ -8,39 +8,57 @@ const medicalRecordSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    // CHANGED: Reference 'Doctor' model explicitly
     doctor: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Doctor",
+      ref: "Doctor", 
       required: true,
     },
-    // Snapshot of patient info at time of visit
+    // CHANGED: Reference 'Patient' model explicitly (if patient is registered)
+    patient: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Patient"
+    },
+    
+    // Snapshot of patient info (Immutable)
     patientDetails: {
       name: String,
       email: String,
       phone: String,
     },
     
-    // General Report Fields
     diagnosis: { type: String, required: true },
-    symptoms: { type: String }, // What patient complained of
+    symptoms: { type: String }, 
+    
     vitalSigns: {
-      bp: String,     // e.g. "120/80"
-      weight: String, // e.g. "70kg"
-      temperature: String, // e.g. "98F"
+      bp: String,          
+      weight: String,      
+      temperature: String, 
+      spo2: String,        
+      heartRate: String    
     },
-    doctorNotes: { type: String }, // Private notes
 
-    // Prescription Array
+    labReports: [
+        {
+            originalName: { type: String },
+            url: { type: String }
+        }
+    ],
+
+    doctorNotes: { type: String },   
+    patientAdvice: { type: String }, 
+
     prescription: [
-      {
-        medicineName: String,
-        dosage: String,
-        frequency: String,
-        duration: String,
-      },
+        {
+            medicineName: String,
+            dosage: String,
+            frequency: String,
+            duration: String,
+            instructions: String, 
+        },
     ],
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("MedicalRecord", medicalRecordSchema);
+module.exports = mongoose.models.MedicalRecord || mongoose.model("MedicalRecord", medicalRecordSchema);

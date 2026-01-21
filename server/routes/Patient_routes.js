@@ -7,7 +7,7 @@ const {
 } = require("../middlewares/auth");
 const {
   getallreports,capturePayment,verifySignature,
-  editprofile
+  editprofile,getPatientAppointments,getPatientDashboardStats
 } = require("../controllers/Patientcontroller");
 const {updateDisplayPicture} = require("../controllers/Common")
 const {isDemo} = require("../middlewares/demo");
@@ -18,4 +18,6 @@ router.post("/verifyPayment",auth,isDemo,verifySignature);
 router.get("/getPatientDetails",auth,isPatient, getalluserdetails);
 router.post("/editprofile",auth,isDemo,isPatient,editprofile);
 router.post("/updateDisplayPicture",auth,isDemo,isPatient,updateDisplayPicture);
+router.get("/appointments", auth, isPatient, getPatientAppointments);
+router.get("/dashboard-stats", auth, isPatient, getPatientDashboardStats);
 module.exports = router;

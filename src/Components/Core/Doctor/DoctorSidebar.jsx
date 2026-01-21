@@ -36,9 +36,6 @@ export function DoctorSidebar({ onLogout }) {
     { id: "timeslots", label: "Time Slots", icon: Clock, path: `${BASE_PATH}/timeslots` },
     { id: "appointments", label: "Appointments", icon: Calendar, path: `${BASE_PATH}/appointments` },
     { id: "patients", label: "Patients", icon: Users, path: `${BASE_PATH}/patients` },
-    { id: "prescriptions", label: "Prescriptions", icon: Pill, path: `${BASE_PATH}/prescriptions` },
-    { id: "reports", label: "Reports", icon: FileText, path: `${BASE_PATH}/reports` },
-    { id: "status", label: "Status", icon: Activity, path: `${BASE_PATH}/status` },
     { id: "profile", label: "Profile", icon: Settings, path: `${BASE_PATH}/profile` },
   ];
 
