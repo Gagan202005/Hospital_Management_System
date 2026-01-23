@@ -19,16 +19,30 @@ export const profendpoints = {
 }
 
 export const Adminendpoints = {
-  ADD_PATIENT_API : BASE_URL + "/Admin/Add_Patient",
-  ALL_USER_API : BASE_URL + "/Admin/getAllUser",
-  ADD_AMBULANCE_API : BASE_URL + "/Admin/Add_Ambulance",
-  ALL_AMBULANCE_API : BASE_URL + "/Admin/getAllAmbulance",
-  GET_ALL_BEDS_API : BASE_URL + "/Admin/getAllBed",
-  ADD_BED_API : BASE_URL + "/Admin/Add_Bed",
-  ADD_ADMIN_API : BASE_URL + "/Admin/Add_Admin",
-  ADD_DOCTOR_API: BASE_URL + "/Admin/Add_Doctor",
+  ADD_AMBULANCE_API : BASE_URL + "/Admin/add-ambulance",
+  GET_ALL_AMBULANCES_API : BASE_URL + "/Admin/get-all-ambulances",
+  UPDATE_AMBULANCE_API : BASE_URL + "/Admin/update-ambulance",
+  DELETE_AMBULANCE_API : BASE_URL + "/Admin/delete-ambulance",
+  BOOK_AMBULANCE_API : BASE_URL + "/Admin/book-ambulance",
+  COMPLETE_TRIP_API : BASE_URL + "/Admin/complete-ambulance-trip",
+  ADD_ADMIN_API : BASE_URL + "/Admin/add-admin",
+  ADD_DOCTOR_API: BASE_URL + "/Admin/add-doctor",
   UPDATE_ADMIN_PROFILE_API : BASE_URL + "/Admin/updateProfile",
   UPDATE_ADMIN_IMAGE_API : BASE_URL + "/Admin/updateImage",
+  GET_ADMIN_STATS_API : BASE_URL + "/Admin/dashboard-stats",
+  ADD_PATIENT_API: BASE_URL + "/Admin/add-patient",
+  UPDATE_PATIENT_API: BASE_URL + "/Admin/update-patient",
+  DELETE_PATIENT_API: BASE_URL + "/Admin/delete-patient",
+  GET_ALL_USERS_API: BASE_URL + "/Admin/get-all-users",
+  DELETE_DOCTOR_API : BASE_URL + "/Admin/delete-doctor",
+  UPDATE_DOCTOR_API: BASE_URL + "/Admin/update-doctor",
+  ADD_BED_API : BASE_URL + "/Admin/add-bed",
+  GET_ALL_BEDS_API : BASE_URL + "/Admin/get-all-beds",
+  UPDATE_BED_API : BASE_URL + "/Admin/update-bed",
+  DELETE_BED_API : BASE_URL + "/Admin/delete-bed",
+  ALLOCATE_BED_API : BASE_URL + "/Admin/allocate-bed",
+  DISCHARGE_BED_API : BASE_URL + "/Admin/discharge-bed",
+  FIX_APPOINTMENT_API : BASE_URL + "/Admin/fix-appointment",
 }
 
 
@@ -53,4 +67,4 @@ export const MedicalRecordEndpoints = {
   CREATE_VISIT_REPORT_API: BASE_URL + "/medical-record/create",
   UPDATE_VISIT_REPORT_API: BASE_URL + "/medical-record/update",
   GET_REPORT_BY_ID_API: (appointmentId) => BASE_URL + `/medical-record/get/${appointmentId}`,
-};
+}

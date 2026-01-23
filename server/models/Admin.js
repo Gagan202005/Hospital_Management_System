@@ -2,51 +2,43 @@ const mongoose = require("mongoose");
 
 const adminSchema = new mongoose.Schema(
     {
-        // ... (Keep all your existing fields: firstName, lastName, etc.) ...
+        // --- Personal Details ---
         firstName: { type: String, required: true, trim: true },
         lastName: { type: String, required: true, trim: true },
         email: { type: String, required: true, trim: true, unique: true },
         password: { type: String, required: true },
         
-        // Profile Details
-        phoneno: { type: String, trim: true },
-        age: { type: Number, required: true },
-        gender: { type: String, required: true },
-        address: { type: String, required: true },
-        dob: { type: String, required: true },
         image: { type: String, required: true },
+        dob: { type: Date, required: true },
         
-        // Auto-Incrementing ID
-        adminID: { 
-            type: Number, // Changed from String to Number
-            unique: true 
-        },
-
+        // Auto-calculated in backend
+        age: { type: Number, required: true },
+        
+        gender: { type: String, required: true, enum: ["Male", "Female", "Other"] },
+        address: { type: String, required: true },
+        phoneno: { type: String, required: true, trim: true },
+        
+        // --- System Fields ---
+        adminID: { type: Number, unique: true }, // Auto-increment
+        accountType: { type: String, default: "Admin" },
         active: { type: Boolean, default: true },
         token: { type: String },
         resetPasswordExpires: { type: Date },
-        about: { type: String },
-        accountType: { type: String, default: "Admin" },
     },
     { timestamps: true }
 );
 
-// 🚀 AUTO-INCREMENT HOOK
+// 🚀 AUTO-INCREMENT HOOK for adminID
 adminSchema.pre("save", async function (next) {
-    // Only generate ID if it's a new document
     if (this.isNew) {
         try {
-            // Find the Admin with the highest adminID
             const lastAdmin = await mongoose.model("Admin", adminSchema)
-                .findOne({}, { adminID: 1 }) // Select only the ID field
-                .sort({ adminID: -1 })       // Sort descending (highest first)
+                .findOne({}, { adminID: 1 })
+                .sort({ adminID: -1 })
                 .limit(1);
 
-            // If an admin exists, increment. If not, start at 0.
-            this.adminID = lastAdmin && lastAdmin.adminID !== undefined 
-                ? lastAdmin.adminID + 1 
-                : 1;
-                
+            // Start Admin IDs from 1
+            this.adminID = lastAdmin && lastAdmin.adminID ? lastAdmin.adminID + 1 : 1;
             next();
         } catch (error) {
             next(error);

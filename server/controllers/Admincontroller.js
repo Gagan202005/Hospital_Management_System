@@ -7,247 +7,201 @@ const Bed = require("../models/Bed");
 const Nurse = require("../models/Nurse");
 const Ambulance = require("../models/Ambulance");
 const Slot = require("../models/Slot");
+const mailSender = require("../utils/mailSender");
+const nodeCrypto = require("crypto");
+const { accountCreationEmail } = require("../mail/templates/AccountCreationMail");
 require("dotenv").config();
 
-exports.Add_Doctor = async (req, res) => {
+// Helper to calculate Age
+const calculateAge = (dob) => {
+  const diff_ms = Date.now() - new Date(dob).getTime();
+  const age_dt = new Date(diff_ms);
+  return Math.abs(age_dt.getUTCFullYear() - 1970);
+};
+
+// ==========================================
+// 1. ADD DOCTOR (Auto-Password & Email)
+// ==========================================
+exports.addDoctor = async (req, res) => {
     try {
         const {
             firstName, lastName, email, phoneno,
-            password, confirmPassword,
-            dob, age, gender, bloodGroup, address,
+            dob, gender, bloodGroup, address,
             department, specialization, experience, consultationFee,
-            degree, college // These come as separate strings from frontend
+            qualifications // Expecting array: [{degree: "MBBS", college: "AIIMS"}, ...]
         } = req.body;
 
         // 1. Validation
-        if (!firstName || !lastName || !email || !password || !department || !consultationFee) {
+        if (!firstName || !lastName || !email || !phoneno || !dob || !department || !consultationFee) {
             return res.status(400).json({ success: false, message: "Missing required fields" });
         }
-        if (password !== confirmPassword) {
-            return res.status(400).json({ success: false, message: "Passwords do not match" });
-        }
 
-        // 2. Check Existing
         const existingUser = await Doctor.findOne({ email });
         if (existingUser) {
             return res.status(409).json({ success: false, message: "Doctor email already registered" });
         }
 
-        // 3. Hash Password
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // 2. Auto-Generate Credentials
+        const calculatedAge = calculateAge(dob);
+        const rawPassword = "Dr" + nodeCrypto.randomBytes(4).toString("hex");
+        const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-        // 4. Construct Qualification Array
-        const qualificationList = [];
-        if (degree && college) {
-            qualificationList.push({ degree, college });
-        }
-
-        // 5. Create Doctor
-        const doctor = await Doctor.create({
-            firstName,
-            lastName,
-            email,
+        // 3. Create Doctor
+        const newDoctor = await Doctor.create({
+            firstName, lastName, email, phoneno,
             password: hashedPassword,
-            phoneno,
             dob,
-            age,
-            gender,
-            bloodGroup,
-            address,
-            department,
-            specialization,
-            experience,
-            consultationFee,
-            qualification: qualificationList, // Save the array
-            image: `https://api.dicebear.com/6.x/initials/svg?seed=Dr ${lastName}&backgroundColor=00acc1`,
-            accountType: "Doctor"
+            age: calculatedAge,
+            gender, bloodGroup, address,
+            department, specialization, experience, consultationFee,
+            qualification: qualifications || [], // Save the array directly
+            image: `https://api.dicebear.com/6.x/initials/svg?seed=Dr ${firstName} ${lastName}&backgroundColor=00acc1`,
+            accountType: "Doctor",
+            status: "Active"
         });
+
+        // 4. Send Email
+        try {
+            await mailSender(
+                email,
+                "Welcome to City Care Hospital",
+                accountCreationEmail(`Dr. ${firstName}`, email, rawPassword, newDoctor.doctorID)
+            );
+        } catch (e) { console.error("Mail Error:", e.message); }
 
         return res.status(200).json({
             success: true,
-            data: doctor,
+            data: newDoctor,
+            generatedPassword: rawPassword,
             message: "Doctor registered successfully",
         });
 
     } catch (error) {
         console.error("Add Doctor Error:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Failed to register doctor",
-            error: error.message,
-        });
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
-exports.Add_Patient = async (req, res) => {
+// ==========================================
+// 2. UPDATE DOCTOR
+// ==========================================
+exports.updateDoctor = async (req, res) => {
     try {
-        // 1. Destructure using FRONTEND variable names
-        // (The frontend sends 'dob', 'phone', 'confirmPassword')
         const {
-            firstName,
-            lastName,
-            email,
-            password,
-            confirmPassword, // Matches frontend
-            phone,           // Matches frontend
-            age,
-            gender,
-            address,
-            dob,             // Matches frontend (format: "YYYY-MM-DD")
-            emergencyContact // Optional: Add if your model has this field
+            _id, // Get ID from body
+            firstName, lastName, email, phoneno,
+            dob, gender, bloodGroup, address,
+            department, specialization, experience, consultationFee,
+            qualifications 
         } = req.body;
 
-        // 2. Validate all fields are present
-        if (
-            !firstName || !lastName || !email || !password || 
-            !confirmPassword || !phone || !age || !gender || 
-            !address || !dob
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "All fields are required",
-            });
+        if (!_id) return res.status(400).json({ success: false, message: "Doctor ID is required" });
+
+        const updatedDoctor = await Doctor.findByIdAndUpdate(
+            _id,
+            {
+                firstName, lastName, phoneno, dob,
+                age: dob ? calculateAge(dob) : undefined, 
+                gender, bloodGroup, address,
+                department, specialization, experience, consultationFee,
+                qualification: qualifications 
+            },
+            { new: true }
+        );
+
+        if (!updatedDoctor) return res.status(404).json({ success: false, message: "Doctor not found" });
+
+        return res.status(200).json({
+            success: true,
+            message: "Doctor updated successfully",
+            data: updatedDoctor,
+        });
+    } catch (error) {
+        console.error("Update Error:", error);
+        return res.status(500).json({ success: false, message: "Failed to update doctor" });
+    }
+};
+// ... keep deleteDoctor and getAllUsers as they were ...
+exports.deleteDoctor = async (req, res) => {
+    try {
+        const { id } = req.body; 
+        await Doctor.findByIdAndDelete(id);
+        return res.status(200).json({ success: true, message: "Doctor deleted successfully" });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ success: false, message: "Failed to delete doctor" });
+    }
+};
+
+// ==========================================
+// ADD ADMIN (Auto-Password & Age)
+// ==========================================
+exports.addAdmin = async (req, res) => {
+    try {
+        const {
+            firstName, lastName, email, phoneno,
+            dob, gender, address
+        } = req.body;
+
+        // 1. Validation
+        if (!firstName || !lastName || !email || !phoneno || !dob || !gender || !address) {
+            return res.status(400).json({ success: false, message: "All fields are required" });
         }
 
-        // 3. Check if user already exists
-        const existingUser = await Patient.findOne({ email });
-        if (existingUser) {
-            return res.status(409).json({ // 409 = Conflict
-                success: false,
-                message: "User is already registered with us",
-            });
+        // 2. Check Existing
+        const existingAdmin = await Admin.findOne({ email });
+        if (existingAdmin) {
+            return res.status(409).json({ success: false, message: "Admin with this email already exists" });
         }
 
-        // 4. Validate Passwords
-        if (password !== confirmPassword) {
-            return res.status(400).json({
-                success: false,
-                message: "Passwords do not match",
-            });
-        }
+        // 3. Auto-Generate Credentials & Age
+        const calculatedAge = calculateAge(dob);
+        const rawPassword = "Adm" + nodeCrypto.randomBytes(4).toString("hex"); // e.g., Adm8f3a2b
+        const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-        // 5. Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // 6. Create the Patient Entry
-        // Mongoose automatically casts the "YYYY-MM-DD" string from 'dob' to a Date object
-        const patient = await Patient.create({
+        // 4. Create Admin
+        const newAdmin = await Admin.create({
             firstName,
             lastName,
             email,
-            phoneno: phone,   // MAP: frontend 'phone' -> db 'phoneno'
-            age,
+            phoneno,
+            password: hashedPassword,
+            dob,
+            age: calculatedAge, // Auto-saved
             gender,
             address,
-            DOB: dob,         // MAP: frontend 'dob' -> db 'DOB'
-            password: hashedPassword,
-            emergencyContactPhone:emergencyContact,
-            image: `https://api.dicebear.com/6.x/initials/svg?seed=${firstName} ${lastName}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=solid,gradientLinear&backgroundRotation=0,360,-350,-340,-330,-320&fontFamily=Arial&fontWeight=600`,
+            image: `https://api.dicebear.com/6.x/initials/svg?seed=${firstName} ${lastName}&backgroundColor=1e88e5`,
+            accountType: "Admin"
         });
 
-        // 7. Success Response
+        // 5. Send Email
+        try {
+            await mailSender(
+                email,
+                "Admin Access Granted - City Care Hospital",
+                accountCreationEmail(
+                    `${firstName} ${lastName}`,
+                    email,
+                    rawPassword,
+                    newAdmin.adminID // Send Custom ID
+                )
+            );
+        } catch (mailError) {
+            console.error("Email sending failed:", mailError.message);
+        }
+
         return res.status(200).json({
             success: true,
-            user: patient,
-            message: "Patient registered successfully",
+            message: "Admin registered successfully",
+            generatedPassword: rawPassword, // Send back for UI display
+            data: newAdmin,
         });
 
     } catch (error) {
-        console.error("Registration Error:", error); // Log error for debugging
-        return res.status(500).json({
-            success: false,
-            message: "Something went wrong while registering patient",
-        });
+        console.error("Add Admin Error:", error);
+        return res.status(500).json({ success: false, message: "Failed to add admin" });
     }
 };
-
-
-exports.fix_appointment = async (req,res) =>{
-    try{
-        const {doc_email,pat_email,disease,date,time} = req.body;
-        if(!doc_email || !pat_email || !disease || !date || !time){
-            return res.status(500).json({
-            success : false,
-            message : 'all fields are required',
-            })
-        }
-        const patient = await Patient.findOne({email : pat_email});
-        const doctor = await Doctor.findById({email : doc_email});
-        const existingSlot = await Slot.findOne({time:time,docID:doctor._id});
-        if(existingSlot){
-            await Slot.findByIdAndDelete(existingSlot._id);
-        }
-        const appointment = await Appointment.create({
-            patient : patient._id,
-            doctor : doctor._id,
-            time,
-            date,
-            disease,
-        });
-        patient.myappointments.push({appointment});
-        doctor.myappointments.push({appointment});
-        return res.status(200).json({
-            success:true,
-            message:'appointment fixed',
-        });
-    }
-    catch(err){
-        return res.status(500).json({
-            success : false,
-            message : err.message,
-        })
-        
-    }
-}
-
-exports.add_admin = async (req,res) => {
-    try{
-        const {firstName, lastName, email, phoneno, 
-            age, gender, dob, address, 
-            password, confirmPassword } = req.body;
-            if(!firstName || !lastName || !email || !password || !confirmPassword
-             || !phoneno || !age || !gender || !address || !dob){
-                return res.status(500).json({
-                    success : false,
-                    message : "all fields are required",
-                });
-            }
-        const existingUser = await Admin.findOne({email});
-        if(existingUser){
-            return res.status(500).json({
-            success : false,
-            message : "you are already registered with us",
-            });
-        }
-        if(password!==confirmPassword){
-            return res.status(500).json({
-            success : false,
-            message : "password is wrong",
-            });
-        }
-        // Hash the password
-		const hashedPassword = await bcrypt.hash(password, 10);
-
-        const admin = await Admin.create({
-            firstName, lastName, email, phoneno, 
-            age, gender, dob, address, 
-            password: hashedPassword,
-            image: `https://api.dicebear.com/6.x/initials/svg?seed=${firstName} ${lastName}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=solid,gradientLinear&backgroundRotation=0,360,-350,-340,-330,-320&fontFamily=Arial&fontWeight=600`,
-        });
-        return res.status(200).json({
-			success: true,
-			user:admin,
-			message: "User registered successfully",
-		});
-    }
-    catch{
-        return res.status(500).json({
-            success : false,
-            message : "something went wrong",
-        });
-    }
-}
-
 
 exports.add_bed = async (req,res) => {
     try{
@@ -323,52 +277,168 @@ exports.add_nurse = async (req,res) => {
     }
 }
 
-exports.add_ambulance = async (req,res) => {
-    try{
-        const {vehicleNumber,model,year,driverName,driverLicense,driverContact} = req.body;
-        if(!vehicleNumber || !model || !year || !driverName || !driverLicense || !driverContact){
-            return res.status(500).json({
-                success : false,
-                message : "all fields are req",
-            });
+exports.addAmbulance = async (req, res) => {
+    try {
+        const {
+            vehicleNumber, model, year, 
+            driverName, driverLicense, driverContact, 
+            pricePerHour 
+        } = req.body;
+
+        if (!vehicleNumber || !driverName || !pricePerHour) {
+            return res.status(400).json({ success: false, message: "Missing required fields" });
         }
-        const existingambulance = await Ambulance.findOne({vehicleNumber});
-        if(existingambulance){
-            return res.status(500).json({
-            success : false,
-            message : "already added",
-        });
+
+        const existingAmb = await Ambulance.findOne({ vehicleNumber });
+        if (existingAmb) {
+            return res.status(400).json({ success: false, message: "Vehicle Number already exists" });
         }
-        const ambulance = await Ambulance.create({
-            vehicleNumber,model,year,driverName,driverLicense,driverContact
+
+        const newAmbulance = await Ambulance.create({
+            vehicleNumber, model, year,
+            driverName, driverLicense, driverContact,
+            pricePerHour,
+            isAvailable: true
         });
+
         return res.status(200).json({
-            success : true,
-            message : "ambulance added successfully",
+            success: true,
+            data: newAmbulance,
+            message: "Ambulance added successfully"
         });
+
+    } catch (error) {
+        console.error("Add Ambulance Error:", error);
+        return res.status(500).json({ success: false, message: "Failed to add ambulance" });
     }
-    catch(err){
-        return res.status(500).json({
-            success : false,
-            message : "something went wrong",
+};
+
+// ==========================================
+// 2. UPDATE AMBULANCE
+// ==========================================
+exports.updateAmbulance = async (req, res) => {
+    try {
+        const { _id, ...updateData } = req.body;
+        
+        const updatedAmbulance = await Ambulance.findByIdAndUpdate(
+            _id, 
+            updateData, 
+            { new: true }
+        );
+
+        if (!updatedAmbulance) return res.status(404).json({ success: false, message: "Ambulance not found" });
+
+        return res.status(200).json({
+            success: true,
+            data: updatedAmbulance,
+            message: "Ambulance updated successfully"
         });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Failed to update ambulance" });
+    }
+};
+
+// ==========================================
+// 3. DELETE AMBULANCE
+// ==========================================
+exports.deleteAmbulance = async (req, res) => {
+    try {
+        const { id } = req.body;
+        await Ambulance.findByIdAndDelete(id);
+        return res.status(200).json({ success: true, message: "Ambulance deleted successfully" });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Failed to delete ambulance" });
+    }
+};
+
+// ==========================================
+// 4. GET ALL AMBULANCES
+// ==========================================
+exports.getAllAmbulances = async (req, res) => {
+    try {
+        // Fetch and populate patient details if booked
+        const ambulances = await Ambulance.find()
+            .populate("currentTrip.patientId", "firstName lastName patientID phoneno")
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            data: ambulances
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Failed to fetch ambulances" });
+    }
+};
+
+// ==========================================
+// 5. BOOK (DISPATCH) AMBULANCE
+// ==========================================
+exports.bookAmbulance = async (req, res) => {
+    try {
+        const { ambulanceId, patientIdInput, address, reason } = req.body;
+
+        // 1. Find Ambulance
+        const ambulance = await Ambulance.findById(ambulanceId);
+        if (!ambulance) return res.status(404).json({ success: false, message: "Ambulance not found" });
+        if (!ambulance.isAvailable) return res.status(400).json({ success: false, message: "Ambulance is already on duty" });
+
+        // 2. Find Patient (Search by custom patientID or MongoDB _id)
+        // Assuming input is the Custom ID (Number) or String ID
+        let patient = await Patient.findOne({ patientID: patientIdInput });
+        
+        if (!patient) {
+            // Fallback: try finding by _id if input looks like ObjectId
+            if (patientIdInput.match(/^[0-9a-fA-F]{24}$/)) {
+                patient = await Patient.findById(patientIdInput);
+            }
+        }
+
+        if (!patient) return res.status(404).json({ success: false, message: "Patient ID not found" });
+
+        // 3. Update Ambulance Status
+        ambulance.isAvailable = false;
+        ambulance.currentTrip = {
+            patientId: patient._id,
+            address: address,
+            reason: reason,
+            startTime: Date.now()
+        };
+
+        await ambulance.save();
+
+        return res.status(200).json({
+            success: true,
+            message: `Ambulance dispatched for ${patient.firstName} ${patient.lastName}`
+        });
+
+    } catch (error) {
+        console.error("Booking Error:", error);
+        return res.status(500).json({ success: false, message: "Failed to book ambulance" });
+    }
+};
+
+// ==========================================
+// 6. COMPLETE TRIP (Make Available)
+// ==========================================
+exports.completeAmbulanceTrip = async (req, res) => {
+    try {
+        const { ambulanceId } = req.body;
+        const ambulance = await Ambulance.findById(ambulanceId);
+        
+        if (!ambulance) return res.status(404).json({ success: false, message: "Ambulance not found" });
+
+        // Reset
+        ambulance.isAvailable = true;
+        ambulance.currentTrip = { patientId: null, address: "", reason: "", startTime: null };
+        
+        await ambulance.save();
+
+        return res.status(200).json({ success: true, message: "Trip completed. Ambulance is now available." });
+
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Failed to complete trip" });
     }
 }
-
-
-exports.book_ambulance = async (req,res) => {
-    const {amb_id} = req.body;
-    if(!amb_id){
-        return res.status(500).json({
-            success : false,
-            message : "all fields are req",
-        });
-    }
-    const amb = await Ambulance.findById({amb_id});
-    amb.updateOne({availability:false});
-    await amb.save();
-}
-
 
 exports.allocateBed = async (req,res) => {
     try{
@@ -491,18 +561,594 @@ exports.updateAdminProfile = async (req, res) => {
 };
 
 
+exports.getAdminDashboardStats = async (req, res) => {
+  try {
+    // 1. Get Counts (Using separate schemas)
+    const totalPatients = await Patient.countDocuments();
+    const totalDoctors = await Doctor.countDocuments();
+    const totalAppointments = await Appointment.countDocuments();
+    
+    // 2. Calculate Revenue 
+    // We find completed appointments and populate the 'doctor' field to access 'consultationFee'
+    const completedAppointments = await Appointment.find({ status: "Completed" })
+      .populate("doctor", "consultationFee");
+    
+    const totalRevenue = completedAppointments.reduce((acc, curr) => {
+      // Ensure doctor exists and has a fee, otherwise default to 0
+      return acc + (curr.doctor?.consultationFee || 0);
+    }, 0);
+
+    // 3. Get Recent Appointments (Last 5)
+    // Populate 'patient' (from Patient model) and 'doctor' (from Doctor model)
+    const recentAppointments = await Appointment.find()
+      .sort({ date: -1 })
+      .limit(5)
+      .populate("patient", "firstName lastName image") 
+      .populate("doctor", "firstName lastName specialization");
+
+    // 4. Get Doctors List (Limit 5)
+    // No need to populate 'userId' anymore, details are directly in Doctor model
+    const doctorsList = await Doctor.find()
+      .select("firstName lastName specialization consultationFee image")
+      .limit(5);
+
+    // 5. Appointment Status Distribution
+    const scheduledCount = await Appointment.countDocuments({ status: "Scheduled" });
+    const cancelledCount = await Appointment.countDocuments({ status: "Cancelled" });
+    const completedCount = completedAppointments.length;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        counts: {
+            patients: totalPatients,
+            doctors: totalDoctors,
+            appointments: totalAppointments,
+            revenue: totalRevenue
+        },
+        recentAppointments,
+        doctorsList,
+        appointmentStats: {
+            scheduled: scheduledCount,
+            cancelled: cancelledCount,
+            completed: completedCount
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("ADMIN_DASHBOARD_ERROR", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch dashboard data" });
+  }
+};
+
+
+exports.addPatient = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      phoneno,
+      address,
+      emergencyContactName,
+      emergencyContactPhone,
+      gender,
+      dob, 
+    } = req.body;
+
+    // 1. Validation for Required Fields
+    if(!firstName || !lastName || !email || !phoneno || !dob) {
+        return res.status(400).json({ success: false, message: "Please fill all required fields." });
+    }
+
+    // 2. Check if Patient Exists
+    const existingPatient = await Patient.findOne({ email });
+    if (existingPatient) {
+      return res.status(400).json({ success: false, message: "Patient with this email already exists." });
+    }
+
+    // 3. Data Sanitization (FIX FOR 500 ERROR)
+    // Fix Date: Empty string "" causes CastError in Mongoose Date field
+    const validDob = dob === "" ? null : dob;
+
+    // Fix Gender: Empty string "" causes ValidationError if not in Enum
+    // Your Schema Enum: ["male", "female", "other", "prefer not to say", "Not specified"]
+    let validGender = "Not specified";
+    if (gender && gender !== "") {
+        validGender = gender.toLowerCase(); 
+    }
+
+    // 4. Generate Random Password & Hash it
+    const rawPassword = "Pass" + nodeCrypto.randomBytes(4).toString("hex");
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+    // 5. Create Patient
+    const newPatient = await Patient.create({
+      firstName,
+      lastName,
+      email,
+      phoneno,
+      password: hashedPassword,
+      image: `https://api.dicebear.com/5.x/initials/svg?seed=${firstName} ${lastName}`,
+      DOB: validDob,       // Use sanitized date
+      gender: validGender, // Use sanitized gender
+      address,
+      emergencyContactName,
+      emergencyContactPhone,
+      bloodgroup: "Not specified",
+      admitted: "not admitted"
+    });
+
+    // 6. Send Email
+    try {
+      const generatedID = newPatient.patientID; 
+      const emailBody = accountCreationEmail(
+        `${firstName} ${lastName}`,
+        email,
+        rawPassword,
+        generatedID 
+      );
+
+      await mailSender(
+        email,
+        "Welcome to City Care Hospital - Account Details",
+        emailBody
+      );
+    } catch (mailError) {
+      console.error("Email sending failed:", mailError.message);
+      // We continue execution even if email fails
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient registered successfully",
+      generatedPassword: rawPassword,
+      data: newPatient,
+    });
+
+  } catch (error) {
+    // LOG THE ACTUAL ERROR TO SEE WHAT IS WRONG IN TERMINAL
+    console.error("ADD PATIENT ERROR:", error); 
+    
+    // Return specific error message to frontend for better debugging
+    return res.status(500).json({ 
+        success: false, 
+        message: error.message || "Failed to add patient" 
+    });
+  }
+};
+
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { type } = req.query; // e.g., ?type=patient
+
+    let data = [];
+    
+    if(!type) {
+        return res.status(400).json({ success: false, message: "Type parameter is required" });
+    }
+
+    switch (type.toLowerCase()) {
+      case "patient":
+        data = await Patient.find().sort({ createdAt: -1 });
+        break;
+      case "doctor":
+        data = await Doctor.find().sort({ createdAt: -1 }); 
+        break;
+      case "admin":
+        data = await Admin.find().sort({ createdAt: -1 }); 
+        break;
+      default:
+        return res.status(400).json({ success: false, message: "Invalid user type" });
+    }
+
+    return res.status(200).json({ success: true, data: data });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to fetch users" });
+  }
+};
+// ==========================================
+// UPDATE PATIENT
+// ==========================================
+exports.updatePatient = async (req, res) => {
+  try {
+    const { _id, firstName, lastName, email, phoneno, address, gender, dob, emergencyContactName, emergencyContactPhone } = req.body;
+
+    const updatedPatient = await Patient.findByIdAndUpdate(
+      _id,
+      {
+        firstName,
+        lastName,
+        email,
+        phoneno,
+        address,
+        gender,
+        DOB: dob,
+        emergencyContactName,
+        emergencyContactPhone
+      },
+      { new: true }
+    );
+
+    if (!updatedPatient) {
+      return res.status(404).json({ success: false, message: "Patient not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient updated successfully",
+      data: updatedPatient,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to update patient" });
+  }
+};
+
+// ==========================================
+// DELETE PATIENT
+// ==========================================
+exports.deletePatient = async (req, res) => {
+  try {
+    const { _id } = req.body; 
+    await Patient.findByIdAndDelete(_id);
+    return res.status(200).json({
+      success: true,
+      message: "Patient deleted successfully",
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to delete patient" });
+  }
+};
+
+
+// ==========================================
+// 1. ADD BED
+// ==========================================
+exports.addBed = async (req, res) => {
+    try {
+        const { bedNumber, ward, type, roomNumber, floorNumber, dailyCharge, status } = req.body;
+
+        if (!bedNumber || !ward || !type || !roomNumber || !dailyCharge) {
+            return res.status(400).json({ success: false, message: "Missing required fields" });
+        }
+
+        const existingBed = await Bed.findOne({ bedNumber });
+        if (existingBed) {
+            return res.status(400).json({ success: false, message: "Bed Number already exists" });
+        }
+
+        const newBed = await Bed.create({
+            bedNumber, ward, type, roomNumber, 
+            floorNumber, dailyCharge, status
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Bed added successfully",
+            data: newBed
+        });
+    } catch (error) {
+        console.error("Add Bed Error:", error);
+        return res.status(500).json({ success: false, message: "Failed to add bed" });
+    }
+};
+
+// ==========================================
+// 2. UPDATE BED (Restricted)
+// ==========================================
+exports.updateBed = async (req, res) => {
+    try {
+        const { _id, ...updateData } = req.body;
+        
+        // 1. Find the bed first
+        const bed = await Bed.findById(_id);
+        if (!bed) {
+            return res.status(404).json({ success: false, message: "Bed not found" });
+        }
+
+        // 2. CONSTRAINT: Cannot edit if Occupied
+        if (bed.status === "Occupied") {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Cannot edit bed details while it is occupied. Please discharge the patient first." 
+            });
+        }
+
+        // 3. Proceed with update
+        const updatedBed = await Bed.findByIdAndUpdate(_id, updateData, { new: true });
+
+        return res.status(200).json({
+            success: true,
+            message: "Bed updated successfully",
+            data: updatedBed
+        });
+    } catch (error) {
+        console.error("Update Bed Error:", error);
+        return res.status(500).json({ success: false, message: "Failed to update bed" });
+    }
+};
+
+// ==========================================
+// 3. DELETE BED (Restricted)
+// ==========================================
+exports.deleteBed = async (req, res) => {
+    try {
+        const { id } = req.body;
+        const bed = await Bed.findById(id);
+        
+        if (!bed) return res.status(404).json({ success: false, message: "Bed not found" });
+
+        // CONSTRAINT: Cannot delete if Occupied
+        if (bed.status === "Occupied") {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Cannot delete an occupied bed. Discharge the patient first." 
+            });
+        }
+
+        await Bed.findByIdAndDelete(id);
+        return res.status(200).json({ success: true, message: "Bed deleted successfully" });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Failed to delete bed" });
+    }
+};
+
+// ==========================================
+// 4. GET ALL BEDS
+// ==========================================
+exports.getAllBeds = async (req, res) => {
+    try {
+        const beds = await Bed.find()
+            .populate("patient", "firstName lastName patientID gender")
+            .sort({ bedNumber: 1 });
+
+        return res.status(200).json({ success: true, data: beds });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Failed to fetch beds" });
+    }
+};
+
+// ==========================================
+// 5. ALLOCATE BED (Admit Patient)
+// ==========================================
+exports.allocateBed = async (req, res) => {
+    try {
+        const { bedId, patientIdInput } = req.body;
+
+        // 1. Validate Bed
+        const bed = await Bed.findById(bedId);
+        if (!bed) return res.status(404).json({ success: false, message: "Bed not found" });
+        if (bed.status === "Occupied") return res.status(400).json({ success: false, message: "Bed is already occupied" });
+
+        // 2. Find Patient
+        let patient = await Patient.findOne({ patientID: patientIdInput });
+        // Fallback to ObjectId check if needed
+        if (!patient && patientIdInput.match(/^[0-9a-fA-F]{24}$/)) {
+             patient = await Patient.findById(patientIdInput);
+        }
+        
+        if (!patient) return res.status(404).json({ success: false, message: "Patient not found" });
+
+        // 3. Update Patient Status First
+        patient.admitted = "admitted"; // Ensure this string matches your Patient Schema Enum
+        patient.bed = bed._id; 
+        await patient.save();
+
+        // 4. Update Bed Status Second
+        bed.status = "Occupied";
+        bed.patient = patient._id;
+        await bed.save();
+
+        return res.status(200).json({
+            success: true,
+            message: `Bed allocated to ${patient.firstName} ${patient.lastName}`
+        });
+
+    } catch (error) {
+        console.error("Allocation Error:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: error.message || "Failed to allocate bed" 
+        });
+    }
+};
+
+// ==========================================
+// 6. DISCHARGE PATIENT
+// ==========================================
+exports.dischargeBed = async (req, res) => {
+    try {
+        const { bedId } = req.body;
+        const bed = await Bed.findById(bedId).populate("patient");
+
+        if (!bed) return res.status(404).json({ success: false, message: "Bed not found" });
+
+        // 1. Update Patient (if exists)
+        if (bed.patient) {
+            const patient = await Patient.findById(bed.patient._id);
+            if(patient) {
+                patient.admitted = "not admitted"; // Reset status (lowercase if that's your schema default)
+                patient.bed = null;
+                await patient.save();
+            }
+        }
+
+        // 2. Reset Bed
+        bed.status = "Available";
+        bed.patient = null;
+        await bed.save();
+
+        return res.status(200).json({ success: true, message: "Patient discharged. Bed is now Available." });
+
+    } catch (error) {
+        console.error("Discharge Error:", error);
+        return res.status(500).json({ success: false, message: "Failed to discharge" });
+    }
+};
 
 
 
 
 
+// ==========================================
+// FIX APPOINTMENT (Manual Booking)
+// ==========================================
+exports.fixAppointment = async (req, res) => {
+    try {
+        const {
+            doctorId,
+            date,       // "YYYY-MM-DD"
+            startTime,  // "HH:mm"
+            endTime,    // "HH:mm"
+            firstName,
+            lastName,
+            email,
+            phone,
+            reason,
+            symptoms
+        } = req.body;
 
+        // 1. Validation
+        if (!doctorId || !date || !startTime || !endTime || !firstName || !email || !phone) {
+            return res.status(400).json({ success: false, message: "Missing required fields" });
+        }
 
+        // 2. Find or Create/Update Patient
+        let patient = await Patient.findOne({ email });
+        let isNewUser = false;
+        let generatedPassword = "";
 
+        if (!patient) {
+            // --- CASE A: CREATE NEW PATIENT ---
+            isNewUser = true;
+            // Generate Random Password (e.g., Pat8f7d9a)
+            generatedPassword = "Pat" + nodeCrypto.randomBytes(4).toString("hex"); 
+            const hashedPassword = await bcrypt.hash(generatedPassword, 10);
 
+            patient = await Patient.create({
+                firstName,
+                lastName,
+                email,
+                phoneno: phone,
+                password: hashedPassword,
+                image: `https://api.dicebear.com/5.x/initials/svg?seed=${firstName} ${lastName}`,
+                accountType: "Patient",
+                registrationDate: new Date()
+            });
+        } else {
+            // --- CASE B: UPDATE EXISTING PATIENT ---
+            // Update details provided in the form to keep records fresh
+            patient = await Patient.findByIdAndUpdate(
+                patient._id,
+                {
+                    firstName: firstName,
+                    lastName: lastName,
+                    phoneno: phone,
+                    // We typically don't update email here as it is the identifier
+                },
+                { new: true }
+            );
+        }
 
+        // 3. Create TimeSlot (Validates Overlaps via Schema)
+        let newTimeSlot;
+        try {
+            newTimeSlot = await Slot.create({
+                doctorId,
+                date: new Date(date),
+                startTime,
+                endTime,
+                isBooked: true
+            });
+        } catch (err) {
+            // Catch schema overlap errors
+            if (err.message.includes("overlaps") || err.code === 11000) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "Time slot overlaps with an existing appointment." 
+                });
+            }
+            throw err;
+        }
 
+        // 4. Create Appointment
+        const newAppointment = await Appointment.create({
+            patient: patient._id,
+            patientDetails: { firstName, lastName, email, phone },
+            doctor: doctorId,
+            date: new Date(date),
+            timeSlotId: newTimeSlot._id,
+            timeSlot: `${startTime} - ${endTime}`,
+            reason,
+            symptoms,
+            status: "Scheduled"
+        });
 
+        // 5. Link Data (Update relations)
+        newTimeSlot.appointmentId = newAppointment._id;
+        await newTimeSlot.save();
 
+        await Patient.findByIdAndUpdate(patient._id, { $push: { myappointments: newAppointment._id } });
+        await Doctor.findByIdAndUpdate(doctorId, { $push: { myappointments: newAppointment._id } });
 
+        // 6. Send Comprehensive Email
+        try {
+            // Construct Email Body
+            let emailContent = `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                    <h2 style="color: #4F46E5;">Appointment Confirmed</h2>
+                    <p>Dear ${firstName} ${lastName},</p>
+                    <p>Your appointment has been successfully scheduled.</p>
+                    
+                    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <h3 style="margin-top: 0;">Appointment Details:</h3>
+                        <p><strong>Date:</strong> ${date}</p>
+                        <p><strong>Time:</strong> ${startTime} - ${endTime}</p>
+                        <p><strong>Doctor ID:</strong> ${doctorId}</p>
+                        <p><strong>Reason:</strong> ${reason}</p>
+                    </div>
+            `;
 
+            // Append Credential Section ONLY if new user
+            if (isNewUser) {
+                emailContent += `
+                    <div style="background: #e0e7ff; padding: 15px; border-radius: 8px; border-left: 5px solid #4F46E5; margin: 20px 0;">
+                        <h3 style="margin-top: 0; color: #3730a3;">Account Created Successfully</h3>
+                        <p>A new patient account has been created for you to track your medical history.</p>
+                        <p><strong>Login Email:</strong> ${email}</p>
+                        <p><strong>Temporary Password:</strong> <span style="font-family: monospace; font-size: 1.1em; background: #fff; padding: 2px 6px; border-radius: 4px;">${generatedPassword}</span></p>
+                        <p style="font-size: 0.9em; margin-top: 10px;"><em>Please login and change your password as soon as possible.</em></p>
+                    </div>
+                `;
+            }
+
+            emailContent += `
+                    <p>Thank you for choosing City Care Hospital.</p>
+                </div>
+            `;
+
+            await mailSender(email, "Appointment Confirmation & Account Details", emailContent);
+        } catch (e) {
+            console.error("Email Sending Error:", e);
+            // We do not fail the request if email fails, just log it
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Appointment scheduled successfully",
+            data: newAppointment,
+            newPatientCreated: isNewUser,
+            // Return password to frontend for immediate Toast notification
+            generatedPassword: isNewUser ? generatedPassword : null
+        });
+
+    } catch (error) {
+        console.error("Fix Appointment Error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Internal Server Error" });
+    }
+};

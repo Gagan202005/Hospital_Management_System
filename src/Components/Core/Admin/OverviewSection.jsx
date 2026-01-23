@@ -1,175 +1,181 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card";
-import { Users, Stethoscope, Bed, Truck, Activity, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { 
+    Users, 
+    Stethoscope, 
+    Calendar, 
+    DollarSign, 
+    Activity, 
+    Clock, 
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../ui/card";
 import { Badge } from "../../ui/badge";
-import { Button } from "../../ui/button";
-import { Progress } from "../../ui/progress"; // Assuming you have a progress component, or use standard HTML
+import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
+import { useSelector } from "react-redux";
+import { fetchAdminStats } from "../../../services/operations/AdminApi";
 
 export const OverviewSection = () => {
+  const { token } = useSelector((state) => state.auth);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const getStats = async () => {
+      setLoading(true);
+      if (token) {
+        const data = await fetchAdminStats(token);
+        if (data) setStats(data);
+      }
+      setLoading(false);
+    };
+    getStats();
+  }, [token]);
+
+  if (loading) return <div className="p-8 text-center">Loading Dashboard...</div>;
+  if (!stats) return <div className="p-8 text-center">Failed to load data.</div>;
+
   return (
     <div className="space-y-6">
       {/* 1. Top Level KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-white/80 backdrop-blur-sm shadow-sm border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Total Patients</CardTitle>
-            <Users className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-800">1,284</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              <span className="text-green-600 font-medium">↑ 12%</span> from last month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/80 backdrop-blur-sm shadow-sm border-l-4 border-l-teal-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Doctors On Duty</CardTitle>
-            <Stethoscope className="h-4 w-4 text-teal-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-800">42</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Out of 67 total staff
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/80 backdrop-blur-sm shadow-sm border-l-4 border-l-red-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Critical Beds</CardTitle>
-            <Activity className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-800">18/20</div>
-            <p className="text-xs text-red-600 font-medium mt-1">
-              ICU is 90% Full
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/80 backdrop-blur-sm shadow-sm border-l-4 border-l-orange-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Ambulance Status</CardTitle>
-            <Truck className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-800">3 Active</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              5 Available at base
-            </p>
-          </CardContent>
-        </Card>
+        <StatsCard 
+            title="Total Patients" 
+            value={stats.counts.patients} 
+            icon={<Users className="h-4 w-4 text-blue-600" />} 
+            borderColor="border-l-blue-500"
+            subtext="Registered patients"
+        />
+        <StatsCard 
+            title="Total Doctors" 
+            value={stats.counts.doctors} 
+            icon={<Stethoscope className="h-4 w-4 text-teal-600" />} 
+            borderColor="border-l-teal-500"
+            subtext="Active medical staff"
+        />
+        <StatsCard 
+            title="Total Appointments" 
+            value={stats.counts.appointments} 
+            icon={<Calendar className="h-4 w-4 text-purple-600" />} 
+            borderColor="border-l-purple-500"
+            subtext="All time bookings"
+        />
+        <StatsCard 
+            title="Total Revenue" 
+            value={`$${stats.counts.revenue.toLocaleString()}`} 
+            icon={<DollarSign className="h-4 w-4 text-green-600" />} 
+            borderColor="border-l-green-500"
+            subtext="From completed visits"
+        />
       </div>
 
-      {/* 2. Middle Section: Capacity & Alerts */}
+      {/* 2. Middle Section: Activity & Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left: Ward Capacity (Visual) */}
-        <Card className="col-span-1 lg:col-span-2 bg-white/80 backdrop-blur-sm">
+        {/* Left: Recent Appointments List */}
+        <Card className="col-span-1 lg:col-span-2 bg-white/80 backdrop-blur-sm shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Bed className="w-5 h-5 text-gray-500" />
-              Ward Capacity Status
+              <Clock className="w-5 h-5 text-gray-500" />
+              Recent Appointments
             </CardTitle>
-            <CardDescription>Live occupancy tracking across departments</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {[
-              { name: "General Ward", current: 45, max: 60, color: "bg-blue-500" },
-              { name: "Emergency (ER)", current: 12, max: 15, color: "bg-red-500" },
-              { name: "ICU", current: 18, max: 20, color: "bg-red-600" },
-              { name: "Maternity", current: 8, max: 20, color: "bg-pink-500" },
-              { name: "Pediatrics", current: 15, max: 30, color: "bg-yellow-500" },
-            ].map((ward, i) => {
-               const percentage = Math.round((ward.current / ward.max) * 100);
-               return (
-                <div key={i} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-700">{ward.name}</span>
-                    <span className="text-gray-500">{ward.current}/{ward.max} Beds ({percentage}%)</span>
-                  </div>
-                  {/* Custom Progress Bar Implementation */}
-                  <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full ${ward.color} rounded-full transition-all duration-500`} 
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-               )
-            })}
-          </CardContent>
-        </Card>
-
-        {/* Right: Urgent Action Items */}
-        <Card className="bg-white/80 backdrop-blur-sm border-red-100">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-700">
-              <AlertCircle className="w-5 h-5" />
-              Urgent Alerts
-            </CardTitle>
-            <CardDescription>Requires immediate attention</CardDescription>
+            <CardDescription>Latest bookings across the hospital</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="p-3 bg-red-50 rounded-lg border border-red-100 flex gap-3">
-                <div className="h-2 w-2 mt-2 rounded-full bg-red-500 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-red-900">Low Oxygen Supply</p>
-                  <p className="text-xs text-red-700">ICU Block B oxygen tank below 15%</p>
-                  <Button size="sm" variant="outline" className="mt-2 h-7 text-xs border-red-200 text-red-700 hover:bg-red-100">Notify Staff</Button>
-                </div>
-              </div>
-
-              <div className="p-3 bg-orange-50 rounded-lg border border-orange-100 flex gap-3">
-                <div className="h-2 w-2 mt-2 rounded-full bg-orange-500 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-orange-900">Ambulance Maintenance</p>
-                  <p className="text-xs text-orange-700">Vehicle AMB-04 due for service today</p>
-                </div>
-              </div>
-
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 flex gap-3">
-                <div className="h-2 w-2 mt-2 rounded-full bg-blue-500 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-blue-900">New Staff Review</p>
-                  <p className="text-xs text-blue-700">2 Nurse applications pending approval</p>
-                </div>
-              </div>
+                {stats.recentAppointments.length > 0 ? (
+                    stats.recentAppointments.map((apt) => (
+                        <div key={apt._id} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-lg border">
+                            <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold overflow-hidden">
+                                     {/* Handle Patient Image or Initials */}
+                                     {apt.patient?.image ? (
+                                        <img src={apt.patient.image} alt="pat" className="w-full h-full object-cover"/>
+                                     ) : (
+                                        <span>{apt.patient?.firstName?.[0]}</span>
+                                     )}
+                                </div>
+                                <div>
+                                    <p className="font-medium text-sm">
+                                        {/* Fallback to patientDetails snapshot if populate is empty/null */}
+                                        {apt.patient ? `${apt.patient.firstName} ${apt.patient.lastName}` : apt.patientDetails?.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Dr. {apt.doctor?.firstName} {apt.doctor?.lastName} ({apt.doctor?.specialization})
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <Badge variant={getStatusBadgeVariant(apt.status)} className="mb-1">
+                                    {apt.status}
+                                </Badge>
+                                <p className="text-xs text-muted-foreground">
+                                    {new Date(apt.date).toLocaleDateString()}
+                                </p>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-center text-muted-foreground py-4">No recent appointments found.</p>
+                )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Right: Appointment Status Breakdown */}
+        <Card className="bg-white/80 backdrop-blur-sm shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-gray-500" />
+              Status Overview
+            </CardTitle>
+            <CardDescription>Current appointment states</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <StatusRow 
+                label="Completed" 
+                count={stats.appointmentStats.completed} 
+                total={stats.counts.appointments} 
+                color="bg-green-500" 
+            />
+            <StatusRow 
+                label="Scheduled" 
+                count={stats.appointmentStats.scheduled} 
+                total={stats.counts.appointments} 
+                color="bg-blue-500" 
+            />
+            <StatusRow 
+                label="Cancelled" 
+                count={stats.appointmentStats.cancelled} 
+                total={stats.counts.appointments} 
+                color="bg-red-500" 
+            />
           </CardContent>
         </Card>
       </div>
 
-      {/* 3. Bottom Section: On-Call Doctors Summary */}
-      <Card className="bg-white/80 backdrop-blur-sm">
+      {/* 3. Bottom Section: Active Doctors List */}
+      <Card className="bg-white/80 backdrop-blur-sm shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-gray-500" />
-            Current Shift - Doctors On Call
+            <Stethoscope className="w-5 h-5 text-gray-500" />
+            Medical Staff Overview
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-                { name: "Dr. Sarah Wilson", dept: "Cardiology", status: "In Surgery", time: "08:00 - 16:00" },
-                { name: "Dr. James Chen", dept: "Emergency", status: "Available", time: "12:00 - 20:00" },
-                { name: "Dr. Emily Parker", dept: "Pediatrics", status: "On Rounds", time: "09:00 - 17:00" },
-            ].map((doc, i) => (
-                <div key={i} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50/50">
-                    <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs">
-                            {doc.name.charAt(4)}
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium">{doc.name}</p>
-                            <p className="text-xs text-muted-foreground">{doc.dept}</p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <Badge variant="outline" className="text-xs mb-1">{doc.status}</Badge>
-                        <p className="text-[10px] text-gray-500">{doc.time}</p>
+            {stats.doctorsList.map((doc, i) => (
+                <div key={i} className="flex items-center p-3 border rounded-lg hover:shadow-md transition-all">
+                    <Avatar className="h-10 w-10 mr-3">
+                        {/* UPDATED: accessing doc.image and doc.firstName directly */}
+                        <AvatarImage src={doc.image} />
+                        <AvatarFallback className="bg-teal-100 text-teal-700">
+                            {doc.firstName?.[0]}
+                        </AvatarFallback>
+                    </Avatar>
+                    <div>
+                        {/* UPDATED: accessing doc.firstName directly */}
+                        <p className="text-sm font-semibold">Dr. {doc.firstName} {doc.lastName}</p>
+                        <p className="text-xs text-muted-foreground">{doc.specialization}</p>
+                        <p className="text-xs font-medium text-green-600 mt-1">${doc.consultationFee} / Visit</p>
                     </div>
                 </div>
             ))}
@@ -179,3 +185,47 @@ export const OverviewSection = () => {
     </div>
   );
 };
+
+// --- Sub Components ---
+
+function StatsCard({ title, value, icon, borderColor, subtext }) {
+    return (
+        <Card className={`bg-white/80 backdrop-blur-sm shadow-sm border-l-4 ${borderColor}`}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">{title}</CardTitle>
+            {icon}
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-800">{value}</div>
+            <p className="text-xs text-muted-foreground mt-1">{subtext}</p>
+          </CardContent>
+        </Card>
+    )
+}
+
+function StatusRow({ label, count, total, color }) {
+    const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+                <span className="font-medium text-gray-700">{label}</span>
+                <span className="text-gray-500">{count} ({percentage}%)</span>
+            </div>
+            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                    className={`h-full ${color} rounded-full transition-all duration-500`} 
+                    style={{ width: `${percentage}%` }}
+                />
+            </div>
+        </div>
+    )
+}
+
+function getStatusBadgeVariant(status) {
+    switch(status) {
+        case "Completed": return "default";
+        case "Cancelled": return "destructive";
+        case "Scheduled": return "secondary";
+        default: return "outline";
+    }
+}

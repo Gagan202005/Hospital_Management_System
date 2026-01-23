@@ -2,40 +2,44 @@ const mongoose = require("mongoose");
 
 const bedSchema = new mongoose.Schema(
   {
+    bedID: {
+      type: Number,
+      unique: true
+    },
     bedNumber: {
       type: String,
       required: true,
-      unique: true, // A bed number (e.g., A-101) should be unique across the hospital
+      unique: true, // e.g., "ICU-01"
       trim: true,
     },
     ward: {
       type: String,
       required: true,
       enum: [
-        "emergency",
-        "icu",
-        "cardiology",
-        "orthopedics",
-        "pediatrics",
-        "maternity",
-        "surgery",
-        "general",
+        "Emergency",
+        "ICU",
+        "Cardiology",
+        "Orthopedics",
+        "Pediatrics",
+        "Maternity",
+        "Surgery",
+        "General",
       ],
     },
     type: {
       type: String,
       required: true,
       enum: [
-        "standard",
-        "icu",
-        "emergency",
-        "pediatric",
-        "maternity",
-        "isolation",
+        "Standard",
+        "ICU",
+        "Emergency",
+        "Pediatric",
+        "Maternity",
+        "Isolation",
       ],
     },
     roomNumber: {
-      type: String, // String allows for values like "104-B" or "ICU-2"
+      type: String,
       required: true,
       trim: true,
     },
@@ -43,13 +47,18 @@ const bedSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    dailyCharge: {
+      type: Number,
+      required: true,
+      default: 0
+    },
     status: {
       type: String,
       enum: ["Available", "Occupied", "Maintenance", "Cleaning"],
       default: "Available",
       required: true,
     },
-    // Reference to a Patient model if the bed is Occupied
+    // Reference to Patient if Occupied
     patient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Patient", 
@@ -58,5 +67,24 @@ const bedSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// 🚀 AUTO-INCREMENT HOOK
+bedSchema.pre("save", async function (next) {
+  if (this.isNew) {
+      try {
+          const lastBed = await mongoose.model("Bed", bedSchema)
+              .findOne({}, { bedID: 1 })
+              .sort({ bedID: -1 })
+              .limit(1);
+
+          this.bedID = lastBed && lastBed.bedID ? lastBed.bedID + 1 : 1001;
+          next();
+      } catch (error) {
+          next(error);
+      }
+  } else {
+      next();
+  }
+});
 
 module.exports = mongoose.model("Bed", bedSchema);

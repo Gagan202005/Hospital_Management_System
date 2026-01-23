@@ -5,7 +5,7 @@ import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { Textarea } from "../../ui/textarea";
-import { ShieldAlert, Loader2 } from "lucide-react";
+import { ShieldAlert, Loader2, Copy } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
 import { Add_Admin } from "../../../services/operations/AdminApi";
@@ -15,18 +15,15 @@ export const AddAdminSection = () => {
   const token = useSelector((state) => state.auth.token);
   const dispatch = useDispatch();
 
-  // 1. Complete Form State
+  // 1. Form State (Removed Password, Age)
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     phoneno: "",
-    age: "",
     gender: "",
     dob: "",
     address: "",
-    password: "",
-    confirmPassword: "",
   });
 
   // 2. Input Handlers
@@ -43,11 +40,6 @@ export const AddAdminSection = () => {
   const handleAddAdmin = async (e) => {
     e.preventDefault();
     
-    // Basic Validation
-    if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
     if (!formData.gender) {
       toast.error("Please select a gender");
       return;
@@ -56,24 +48,44 @@ export const AddAdminSection = () => {
     setIsLoading(true);
     try {
       // API Call
-      await Add_Admin(formData, token, dispatch);
+      const response = await Add_Admin(formData, token);
+
+      // Success Toast with Password
+      if(response?.generatedPassword) {
+           toast.success(
+             (t) => (
+               <div className="flex flex-col gap-1">
+                 <span className="font-bold">Admin Account Created!</span>
+                 <div className="flex items-center gap-2 text-sm bg-white/20 p-1 rounded mt-1">
+                   Pass: <code className="font-mono font-bold">{response.generatedPassword}</code>
+                   <button 
+                     onClick={() => {
+                       navigator.clipboard.writeText(response.generatedPassword);
+                       toast.success("Copied!");
+                     }}
+                     className="p-1 hover:bg-black/10 rounded"
+                     title="Copy Password"
+                   >
+                     <Copy className="w-3 h-3" />
+                   </button>
+                 </div>
+                 <span className="text-[10px] opacity-80">Credentials sent via Email.</span>
+               </div>
+             ),
+             { duration: 6000, position: "top-center" }
+           );
+      } else if (response?.success) {
+          toast.success("Admin Added Successfully");
+      }
 
       // Reset Form
       setFormData({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phoneno: "",
-        age: "",
-        gender: "",
-        dob: "",
-        address: "",
-        password: "",
-        confirmPassword: "",
+        firstName: "", lastName: "", email: "", phoneno: "",
+        gender: "", dob: "", address: "",
       });
 
     } catch (error) {
-      console.error("Error adding admin:", error);
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
@@ -84,11 +96,11 @@ export const AddAdminSection = () => {
       <Card className="bg-white/80 backdrop-blur-sm shadow-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl">
-            <ShieldAlert className="w-6 h-6 text-indigo-600" />
+            <ShieldAlert className="w-6 h-6 text-slate-700" />
             Add New Administrator
           </CardTitle>
           <CardDescription>
-            Create a new administrative account with full system access.
+            Create an admin account with full system access. Credentials will be auto-generated.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -136,7 +148,7 @@ export const AddAdminSection = () => {
                 <Input 
                   id="phoneno" 
                   type="tel" 
-                  placeholder="+1 (555) 000-0000" 
+                  placeholder="+91 98765 43210" 
                   value={formData.phoneno} 
                   onChange={handleInputChange} 
                   required 
@@ -144,15 +156,14 @@ export const AddAdminSection = () => {
               </div>
             </div>
 
-            {/* Row 3: Personal Details */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Row 3: Personal Details (Removed Age) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="age">Age</Label>
+                <Label htmlFor="dob">Date of Birth</Label>
                 <Input 
-                  id="age" 
-                  type="number" 
-                  placeholder="Age" 
-                  value={formData.age} 
+                  id="dob" 
+                  type="date" 
+                  value={formData.dob} 
                   onChange={handleInputChange} 
                   required 
                 />
@@ -170,16 +181,6 @@ export const AddAdminSection = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dob">Date of Birth</Label>
-                <Input 
-                  id="dob" 
-                  type="date" 
-                  value={formData.dob} 
-                  onChange={handleInputChange} 
-                  required 
-                />
-              </div>
             </div>
 
             {/* Row 4: Address */}
@@ -191,39 +192,13 @@ export const AddAdminSection = () => {
                 value={formData.address} 
                 onChange={handleInputChange} 
                 required 
-                className="resize-none"
+                className="resize-none min-h-[80px]"
               />
-            </div>
-
-            {/* Row 5: Security */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  placeholder="Create strong password" 
-                  value={formData.password} 
-                  onChange={handleInputChange} 
-                  required 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input 
-                  id="confirmPassword" 
-                  type="password" 
-                  placeholder="Confirm password" 
-                  value={formData.confirmPassword} 
-                  onChange={handleInputChange} 
-                  required 
-                />
-              </div>
             </div>
 
             <Button 
               type="submit" 
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white" 
+              className="w-full bg-slate-800 hover:bg-slate-900 text-white shadow-lg mt-4" 
               disabled={isLoading}
             >
               {isLoading ? (
