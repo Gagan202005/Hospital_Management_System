@@ -123,55 +123,52 @@ export const deleteTimeSlot = async (slotId, token) => {
 };
 
 // --- UPDATE PROFILE ---
-export async function updateDoctorProfile(profile, token, dispatch, toast) {
-  
-  dispatch(setLoading(true));
-  
+export async function updateDoctorProfile(data, token, dispatch) {
+  const toastId = toast.loading("Updating Profile...");
   try {
-    // Sanitize Data to match Schema
-    const payload = {
-      ...profile,
-      phoneno: profile.phoneno, 
-      qualification: profile.qualification
-    };
-
     const response = await apiConnector(
-      "PUT", 
+      "PUT",
       UPDATE_DOCTOR_PROFILE_API,
-      payload,
-      { Authorization: `Bearer ${token}` }
+      {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneno: data.phoneno,       // <--- Sending Phone
+        address: data.address,       // <--- Sending Address
+        dob: data.dob,
+        age: data.age,
+        gender: data.gender,
+        bloodGroup: data.bloodGroup,
+        department: data.department,
+        specialization: data.specialization,
+        qualification: data.qualification,
+        experience: data.experience,
+        consultationFee: data.consultationFee,
+        about: data.about,
+      },
+      {
+        Authorization: `Bearer ${token}`,
+      }
     );
 
     if (!response.data.success) {
       throw new Error(response.data.message);
     }
 
-    // SUCCESS TOAST (Shadcn Syntax)
-    toast({
-      title: "Success",
-      description: "Profile updated successfully.",
-      variant: "default",
-    });
+    toast.success("Profile Updated Successfully");
+
+    // Update Redux State (preserve existing image if backend doesn't send it back)
+    const currentUser = JSON.parse(localStorage.getItem("user"));
+    const updatedUser = { ...currentUser, ...response.data.data };
     
-    // Update Storage & Redux
-    const updatedUser = response.data.data;
     localStorage.setItem("user", JSON.stringify(updatedUser));
     dispatch(setUser(updatedUser));
 
   } catch (error) {
-    console.log("UPDATE_PROFILE_API ERROR:", error);
-    
-    // ERROR TOAST (Shadcn Syntax)
-    toast({
-      title: "Update Failed",
-      description: error?.response?.data?.message || "Could not update profile.",
-      variant: "destructive",
-    });
+    console.log("UPDATE_DOCTOR_PROFILE API ERROR............", error);
+    toast.error(error?.response?.data?.message || "Could not update profile");
   }
-  
-  dispatch(setLoading(false));
+  toast.dismiss(toastId);
 }
-
 // --- UPDATE PROFILE PICTURE ---
 export async function updateDoctorPfp(token, pfp, dispatch, toast) {
   try {
@@ -330,29 +327,31 @@ export const updateAppointmentStatus = async (token, data) => {
 };
 
 
-export const bookAppointmentApi = async (data,token,navigate) => {
+export const bookAppointmentApi = async (data, token, navigate) => {
+  const toastId = toast.loading("Processing request...");
   try {
-    const response = await apiConnector("POST", BOOK_APPOINTMENT_API, data,{Authorization: `Bearer ${token}`});
+    const response = await apiConnector(
+      "POST", 
+      BOOK_APPOINTMENT_API, 
+      data,
+      { Authorization: `Bearer ${token}` }
+    );
 
     if (!response?.data?.success) {
       throw new Error(response.data.message);
     }
 
-    toast({
-      title: "Success!",
-      description: "Appointment booked successfully.",
-    });
+    toast.success("Request Sent! Check your email.");
+    navigate("/patient-dashboard/appointments"); // Redirect to dashboard instead of home
     
-    navigate("/"); 
   } catch (error) {
     console.log("BOOK_APPOINTMENT_ERROR:", error);
-    toast({
-      title: "Booking Failed",
-      description: error.response?.data?.message || "Could not book appointment",
-      variant: "destructive"
-    });
+    toast.error(error.response?.data?.message || "Could not book appointment");
+  } finally {
+    toast.dismiss(toastId);
   }
 };
+
 
 export const fetchTimeSlotsbyDate = async (doctorId, date) => {
   let result = [];

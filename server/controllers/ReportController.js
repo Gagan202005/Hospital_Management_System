@@ -62,6 +62,24 @@ exports.createVisitReport = async (req, res) => {
     appointment.status = "Completed";
     await appointment.save();
 
+    if (appointment && appointment.patientDetails?.email) {
+            try {
+                await mailSender(
+                    appointment.patientDetails.email,
+                    "Medical Report Generated",
+                    `<div style="font-family: sans-serif;">
+                        <h2>Your Visit is Completed</h2>
+                        <p>Dr. has generated your medical report.</p>
+                        <p>You can login to the patient portal to view and download your prescription and diagnosis.</p>
+                        <a href="https://your-website.com/patient-dashboard/appointments">View Report</a>
+                    </div>`
+                );
+            } catch (e) {
+                console.error("Report Mail Error", e);
+            }
+        }
+
+        
     return res.status(200).json({
       success: true,
       message: "Visit Report created successfully",

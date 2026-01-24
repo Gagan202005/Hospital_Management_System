@@ -91,25 +91,11 @@ const patientschema = new mongoose.Schema(
             ref: "Bed",
             default: null
         },
-        disease: [{
-            type: String,
-            trim: true
-        }],
         
-        // Medical Records - Defaults to empty arrays
-        reports: [{
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "MedicalRecord",
-        }],
         myappointments: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: "Appointment",
         }],
-        docID: [{
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Doctor",
-        }],
-        
         emergencyContactName: {
             
                 type: String,

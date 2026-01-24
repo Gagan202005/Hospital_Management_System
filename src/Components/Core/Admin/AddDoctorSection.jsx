@@ -5,15 +5,12 @@ import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { Textarea } from "../../ui/textarea";
-import { Badge } from "../../ui/badge";
 import { 
-  Stethoscope, Search, Edit, Trash2, Loader2, IndianRupee, Copy, 
-  Plus, X, Save, GraduationCap, School, 
-  Users, Building2, CalendarDays 
+  Stethoscope, Search, Edit, Trash2, Loader2, Copy, 
+  Plus, X, Save, GraduationCap, School, Users, Building2 
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
-
 import { Add_Doctor, Delete_Doctor, Update_Doctor, getAllUsers } from "../../../services/operations/AdminApi";
 
 export const AddDoctorSection = () => {
@@ -22,417 +19,213 @@ export const AddDoctorSection = () => {
   const token = useSelector((state) => state.auth.token);
   const dispatch = useDispatch();
 
-  // Search & Edit State
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [doctors, setDoctors] = useState([]);
 
   // Form State
   const [formData, setFormData] = useState({
     firstName: "", lastName: "", email: "", phoneno: "",
     dob: "", gender: "", bloodGroup: "", address: "", 
     department: "", specialization: "", experience: "", consultationFee: "",
-    // Dynamic Qualifications Array
     qualifications: [] 
   });
-
-  // Temporary State for Adding a Qualification
   const [newQual, setNewQual] = useState({ degree: "", college: "" });
 
-  const [doctors, setDoctors] = useState([]);
-
-  // --- Fetch Doctors ---
+  // --- Fetch ---
   const fetchDoctors = async () => {
     setIsFetching(true);
     try {
       const response = await getAllUsers(token, "doctor");
       if (Array.isArray(response)) setDoctors(response);
-      else setDoctors([]);
-    } catch (error) {
-      console.error("Fetch Error:", error);
-    } finally {
-      setIsFetching(false);
-    }
+    } catch (error) { console.error(error); } 
+    finally { setIsFetching(false); }
   };
 
-  useEffect(() => {
-    fetchDoctors();
-  }, [token]);
+  useEffect(() => { fetchDoctors(); }, [token]);
 
-  // =================================================================
-  // STATISTICS CALCULATION
-  // =================================================================
+  // --- Stats ---
   const stats = useMemo(() => {
-    const total = doctors.length;
-    
-    // Count unique departments
-    const uniqueDepts = new Set(doctors.map(d => d.department)).size;
-
-    // Count new joins today
-    const today = new Date().setHours(0,0,0,0);
-    const newToday = doctors.filter(d => {
-        if(!d.createdAt) return false;
-        const dDate = new Date(d.createdAt).setHours(0,0,0,0);
-        return dDate === today;
-    }).length;
-
-    return { total, uniqueDepts, newToday };
+    return {
+      total: doctors.length,
+      depts: new Set(doctors.map(d => d.department)).size,
+      newToday: doctors.filter(d => new Date(d.createdAt).setHours(0,0,0,0) === new Date().setHours(0,0,0,0)).length
+    };
   }, [doctors]);
 
   // --- Handlers ---
-  const handleInputChange = (e) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
+  const handleInputChange = (e) => setFormData(p => ({ ...p, [e.target.id]: e.target.value }));
+  const handleSelectChange = (k, v) => setFormData(p => ({ ...p, [k]: v }));
+
+  const addQual = () => {
+    if (!newQual.degree || !newQual.college) return toast.error("Enter degree & college");
+    setFormData(p => ({ ...p, qualifications: [...p.qualifications, newQual] }));
+    setNewQual({ degree: "", college: "" });
   };
 
-  const handleSelectChange = (key, value) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
-  };
-
-  // --- Qualification Logic ---
-  const addQualification = () => {
-    if (!newQual.degree || !newQual.college) {
-      toast.error("Please enter both Degree and College");
-      return;
-    }
-    setFormData((prev) => ({
-      ...prev,
-      qualifications: [...prev.qualifications, newQual]
-    }));
-    setNewQual({ degree: "", college: "" }); 
-  };
-
-  const removeQualification = (index) => {
-    const newQuals = formData.qualifications.filter((_, i) => i !== index);
-    setFormData((prev) => ({ ...prev, qualifications: newQuals }));
+  const removeQual = (idx) => {
+    setFormData(p => ({ ...p, qualifications: p.qualifications.filter((_, i) => i !== idx) }));
   };
 
   const resetForm = () => {
     setFormData({
-      firstName: "", lastName: "", email: "", phoneno: "",
-      dob: "", gender: "", bloodGroup: "", address: "", department: "",
-      specialization: "", experience: "", consultationFee: "",
-      qualifications: []
+      firstName: "", lastName: "", email: "", phoneno: "", dob: "", gender: "", bloodGroup: "", 
+      address: "", department: "", specialization: "", experience: "", consultationFee: "", qualifications: []
     });
-    setNewQual({ degree: "", college: "" });
-    setIsEditing(false);
-    setEditId(null);
+    setIsEditing(false); setEditId(null);
   };
 
-  // --- Submit Handler ---
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (formData.qualifications.length === 0) return toast.error("Add at least one qualification");
     
-    if (formData.qualifications.length === 0) {
-        toast.error("Please add at least one qualification");
-        return;
-    }
-
     setIsLoading(true);
-
     try {
       if (isEditing) {
-        // UPDATE
         await Update_Doctor({ ...formData, _id: editId }, token);
-        resetForm();
+        toast.success("Profile updated");
       } else {
-        // ADD
-        const response = await Add_Doctor(formData, token, dispatch);
-        
-        if(response?.generatedPassword) {
+        const res = await Add_Doctor(formData, token, dispatch);
+        if(res?.generatedPassword) {
            toast.success((t) => (
                <div className="flex flex-col gap-1">
-                 <span className="font-bold">Doctor Added!</span>
-                 <div className="flex items-center gap-2 text-sm bg-white/20 p-1 rounded mt-1">
-                   Pass: <code className="font-mono font-bold">{response.generatedPassword}</code>
-                   <button onClick={() => { navigator.clipboard.writeText(response.generatedPassword); toast.success("Copied!"); }} className="p-1 hover:bg-black/10 rounded"><Copy className="w-3 h-3" /></button>
+                 <span className="font-bold">Doctor Onboarded!</span>
+                 <div className="flex items-center gap-2 text-sm bg-white/20 p-2 rounded mt-1">
+                   Pass: <code className="font-mono font-bold">{res.generatedPassword}</code>
+                   <button onClick={() => { navigator.clipboard.writeText(res.generatedPassword); toast.success("Copied"); }} className="p-1 hover:bg-black/10 rounded"><Copy className="w-3 h-3" /></button>
                  </div>
-                 <span className="text-[10px] opacity-80">Sent via Email.</span>
                </div>
-             ), { duration: 6000, position: "top-center" });
-        } else {
-            toast.success("Doctor Added Successfully");
+             ), { duration: 8000 });
         }
-        resetForm();
       }
-      fetchDoctors(); 
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+      fetchDoctors(); resetForm();
+    } catch (error) { console.error(error); } 
+    finally { setIsLoading(false); }
   };
 
-  // --- Edit Handler ---
   const handleEditClick = (doc) => {
-    setIsEditing(true);
-    setEditId(doc._id);
-    
+    setIsEditing(true); setEditId(doc._id);
     setFormData({
-      firstName: doc.firstName || "",
-      lastName: doc.lastName || "",
-      email: doc.email || "",
-      phoneno: doc.phoneno || "",
-      dob: doc.dob || "",
-      gender: doc.gender || "",
-      bloodGroup: doc.bloodGroup || "",
-      address: doc.address || "",
-      department: doc.department || "",
-      specialization: doc.specialization || "",
-      experience: doc.experience || "",
-      consultationFee: doc.consultationFee || "",
-      qualifications: doc.qualification || []
+      firstName: doc.firstName || "", lastName: doc.lastName || "", email: doc.email || "",
+      phoneno: doc.phoneno || "", dob: doc.dob || "", gender: doc.gender || "",
+      bloodGroup: doc.bloodGroup || "", address: doc.address || "", department: doc.department || "",
+      specialization: doc.specialization || "", experience: doc.experience || "",
+      consultationFee: doc.consultationFee || "", qualifications: doc.qualification || []
     });
-    
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    toast("Editing mode enabled", { icon: "✏️" });
   };
 
-  const handleDeleteDoctor = async (id) => {
-    if(window.confirm("Are you sure?")) {
+  const handleDelete = async (id) => {
+    if(window.confirm("Delete this doctor?")) {
         await Delete_Doctor(id, token);
         fetchDoctors();
     }
   };
 
-  // --- Search Logic ---
   const filteredDoctors = useMemo(() => {
     if (!searchQuery) return doctors;
-    const query = searchQuery.toLowerCase().trim();
-    return doctors.filter((doc) => {
-      const fullName = `${doc.firstName} ${doc.lastName}`.toLowerCase();
-      const dID = (doc.doctorID || "").toString();
-      const dept = (doc.department || "").toLowerCase();
-      return fullName.includes(query) || dept.includes(query) || dID.startsWith(query);
-    });
+    const q = searchQuery.toLowerCase();
+    return doctors.filter(doc => `${doc.firstName} ${doc.lastName}`.toLowerCase().includes(q) || doc.department.toLowerCase().includes(q));
   }, [doctors, searchQuery]);
 
   return (
     <div className="space-y-6">
-
-      {/* ======================= STATS OVERVIEW ======================= */}
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-indigo-50 border-indigo-100">
-              <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                      <p className="text-sm text-indigo-600 font-medium">Total Doctors</p>
-                      <h3 className="text-2xl font-bold text-indigo-900">{stats.total}</h3>
-                  </div>
-                  <Users className="h-8 w-8 text-indigo-300" />
-              </CardContent>
-          </Card>
-          <Card className="bg-purple-50 border-purple-100">
-              <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                      <p className="text-sm text-purple-600 font-medium">Departments</p>
-                      <h3 className="text-2xl font-bold text-purple-900">{stats.uniqueDepts}</h3>
-                  </div>
-                  <Building2 className="h-8 w-8 text-purple-300" />
-              </CardContent>
-          </Card>
-          <Card className="bg-emerald-50 border-emerald-100">
-              <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                      <p className="text-sm text-emerald-600 font-medium">Joined Today</p>
-                      <h3 className="text-2xl font-bold text-emerald-900">{stats.newToday}</h3>
-                  </div>
-                  <CalendarDays className="h-8 w-8 text-emerald-300" />
-              </CardContent>
-          </Card>
+          <Card className="bg-indigo-50 border-indigo-100 shadow-sm"><CardContent className="p-4 flex justify-between items-center"><div><p className="text-indigo-600 font-medium text-sm">Total Staff</p><h3 className="text-2xl font-bold text-indigo-900">{stats.total}</h3></div><Users className="h-8 w-8 text-indigo-300" /></CardContent></Card>
+          <Card className="bg-purple-50 border-purple-100 shadow-sm"><CardContent className="p-4 flex justify-between items-center"><div><p className="text-purple-600 font-medium text-sm">Departments</p><h3 className="text-2xl font-bold text-purple-900">{stats.depts}</h3></div><Building2 className="h-8 w-8 text-purple-300" /></CardContent></Card>
+          <Card className="bg-emerald-50 border-emerald-100 shadow-sm"><CardContent className="p-4 flex justify-between items-center"><div><p className="text-emerald-600 font-medium text-sm">Joined Today</p><h3 className="text-2xl font-bold text-emerald-900">{stats.newToday}</h3></div><Users className="h-8 w-8 text-emerald-300" /></CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        
-        {/* ======================= FORM CARD ======================= */}
-        <Card className={`bg-white/80 backdrop-blur-sm h-fit transition-all ${isEditing ? "border-blue-500 ring-1 ring-blue-500 shadow-md" : ""}`}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-                <CardTitle className="flex items-center gap-2">
-                {isEditing ? <Edit className="w-5 h-5 text-blue-600" /> : <Stethoscope className="w-5 h-5 text-indigo-600" />}
-                {isEditing ? "Edit Doctor Details" : "Add New Doctor"}
-                </CardTitle>
-                <CardDescription>{isEditing ? "Update professional information" : "Auto-generated Password"}</CardDescription>
+        {/* Form */}
+        <Card className={`h-fit ${isEditing ? "border-indigo-500 shadow-md" : "border-slate-200"}`}>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+                <CardTitle className="flex items-center gap-2">{isEditing ? <Edit className="w-5 h-5 text-indigo-600"/> : <Stethoscope className="w-5 h-5 text-indigo-600"/>} {isEditing ? "Update Profile" : "Onboard Doctor"}</CardTitle>
+                {isEditing && <Button variant="ghost" size="sm" onClick={resetForm} className="text-red-500"><X className="w-4 h-4 mr-1"/> Cancel</Button>}
             </div>
-            {isEditing && (
-                <Button variant="ghost" size="sm" onClick={resetForm} className="text-red-500 hover:bg-red-50">
-                    <X className="w-4 h-4 mr-1" /> Cancel
-                </Button>
-            )}
+            <CardDescription>Enter professional and personal details.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              
-              {/* Personal Info */}
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>First Name</Label><Input id="firstName" value={formData.firstName} onChange={handleInputChange} required /></div>
-                <div><Label>Last Name</Label><Input id="lastName" value={formData.lastName} onChange={handleInputChange} required /></div>
+                <div className="space-y-1"><Label>First Name</Label><Input id="firstName" value={formData.firstName} onChange={handleInputChange} required /></div>
+                <div className="space-y-1"><Label>Last Name</Label><Input id="lastName" value={formData.lastName} onChange={handleInputChange} required /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Email</Label><Input id="email" type="email" value={formData.email} onChange={handleInputChange} required /></div>
-                <div><Label>Phone</Label><Input id="phoneno" value={formData.phoneno} onChange={handleInputChange} required /></div>
+                <div className="space-y-1"><Label>Email</Label><Input id="email" type="email" value={formData.email} onChange={handleInputChange} required /></div>
+                <div className="space-y-1"><Label>Phone</Label><Input id="phoneno" value={formData.phoneno} onChange={handleInputChange} required /></div>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                 <div><Label>DOB</Label><Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} required /></div>
-                 <div>
-                    <Label>Gender</Label>
-                    <Select onValueChange={(val) => handleSelectChange("gender", val)} value={formData.gender}>
-                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Male">Male</SelectItem>
-                            <SelectItem value="Female">Female</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                 <div><Label>Blood Group</Label><Input id="bloodGroup" placeholder="O+" value={formData.bloodGroup} onChange={handleInputChange} required /></div>
+                 <div className="space-y-1"><Label>DOB</Label><Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} required /></div>
+                 <div className="space-y-1"><Label>Gender</Label><Select onValueChange={(v) => handleSelectChange("gender", v)} value={formData.gender}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem></SelectContent></Select></div>
+                 <div className="space-y-1"><Label>Blood Group</Label><Input id="bloodGroup" value={formData.bloodGroup} onChange={handleInputChange} /></div>
               </div>
-
-              {/* Department & Fees */}
+              
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                <div className="space-y-1">
                   <Label>Department</Label>
-                  <Select onValueChange={(val) => handleSelectChange("department", val)} value={formData.department}>
-                    <SelectTrigger><SelectValue placeholder="Select Dept" /></SelectTrigger>
+                  <Select onValueChange={(v) => handleSelectChange("department", v)} value={formData.department}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Cardiology">Cardiology</SelectItem>
-                      <SelectItem value="Neurology">Neurology</SelectItem>
-                      <SelectItem value="Pediatrics">Pediatrics</SelectItem>
-                      <SelectItem value="Orthopedics">Orthopedics</SelectItem>
-                      <SelectItem value="Dermatology">Dermatology</SelectItem>
-                      <SelectItem value="General Surgery">General Surgery</SelectItem>
-                      <SelectItem value="Oncology">Oncology</SelectItem>
+                      {["Cardiology", "Neurology", "Pediatrics", "Orthopedics", "Dermatology", "General Surgery", "Oncology"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label>Specialization</Label><Input id="specialization" value={formData.specialization} onChange={handleInputChange} /></div>
+                <div className="space-y-1"><Label>Specialization</Label><Input id="specialization" value={formData.specialization} onChange={handleInputChange} /></div>
               </div>
-
-               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Experience</Label><Input id="experience" value={formData.experience} onChange={handleInputChange} required /></div>
-                <div>
-                   <Label>Consultation Fee</Label>
-                   <div className="relative">
-                     <IndianRupee className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-                     <Input id="consultationFee" type="number" className="pl-8" value={formData.consultationFee} onChange={handleInputChange} required />
-                   </div>
-                </div>
-              </div>
-
-               {/* ================================================================= */}
-               {/* QUALIFICATIONS SECTION */}
-               {/* ================================================================= */}
-               <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                   <Label className="flex items-center gap-2 text-indigo-700">
-                       <GraduationCap className="w-4 h-4" /> Educational Qualifications
-                   </Label>
-                   
-                   {/* Input Area */}
-                   <div className="flex gap-2 items-end">
-                       <div className="flex-1 space-y-1">
-                           <Input 
-                               placeholder="Degree (e.g. MBBS)" 
-                               value={newQual.degree}
-                               onChange={(e) => setNewQual({...newQual, degree: e.target.value})}
-                               className="bg-white"
-                           />
-                       </div>
-                       <div className="flex-1 space-y-1">
-                           <Input 
-                               placeholder="University / College" 
-                               value={newQual.college}
-                               onChange={(e) => setNewQual({...newQual, college: e.target.value})}
-                               className="bg-white"
-                           />
-                       </div>
-                       <Button type="button" size="sm" onClick={addQualification} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                           <Plus className="w-4 h-4" /> Add
-                       </Button>
-                   </div>
-
-                   {/* List Area */}
-                   {formData.qualifications.length > 0 ? (
-                       <div className="flex flex-col gap-2 mt-2">
-                           {formData.qualifications.map((qual, index) => (
-                               <div key={index} className="flex items-center justify-between bg-white p-2 rounded border shadow-sm text-sm animate-in fade-in slide-in-from-top-1">
-                                   <div className="flex items-center gap-3">
-                                       <div className="bg-indigo-100 p-1.5 rounded-full text-indigo-600">
-                                           <School className="w-3.5 h-3.5" />
-                                       </div>
-                                       <div>
-                                           <p className="font-medium text-gray-900">{qual.degree}</p>
-                                           <p className="text-xs text-gray-500">{qual.college}</p>
-                                       </div>
-                                   </div>
-                                   <Button 
-                                       type="button" 
-                                       variant="ghost" 
-                                       size="icon" 
-                                       className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
-                                       onClick={() => removeQualification(index)}
-                                   >
-                                       <X className="w-3.5 h-3.5" />
-                                   </Button>
-                               </div>
-                           ))}
-                       </div>
-                   ) : (
-                       <p className="text-xs text-center text-gray-400 py-2 border-dashed border rounded">
-                           No qualifications added yet.
-                       </p>
-                   )}
-               </div>
-               {/* ================================================================= */}
               
-              <div><Label>Address</Label><Textarea id="address" value={formData.address} onChange={handleInputChange} required className="min-h-[60px]" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><Label>Experience</Label><Input id="experience" value={formData.experience} onChange={handleInputChange} required /></div>
+                <div className="space-y-1"><Label>Fee (₹)</Label><Input id="consultationFee" type="number" value={formData.consultationFee} onChange={handleInputChange} required /></div>
+              </div>
 
-              <Button type="submit" className={`w-full text-white mt-2 ${isEditing ? "bg-indigo-600 hover:bg-indigo-700" : "bg-primary hover:bg-primary/90"}`} disabled={isLoading}>
-                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isEditing ? "Updating..." : "Creating Account..."}</> : <>{isEditing ? <><Save className="w-4 h-4 mr-2"/> Update Doctor</> : "Add Doctor"}</>}
-              </Button>
+              {/* Qualifications */}
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                  <Label className="text-xs font-bold text-slate-500 uppercase">Education</Label>
+                  <div className="flex gap-2">
+                      <Input placeholder="Degree" value={newQual.degree} onChange={e=>setNewQual({...newQual, degree: e.target.value})} className="bg-white"/>
+                      <Input placeholder="Institute" value={newQual.college} onChange={e=>setNewQual({...newQual, college: e.target.value})} className="bg-white"/>
+                      <Button type="button" size="sm" onClick={addQual} className="bg-indigo-600"><Plus className="w-4 h-4"/></Button>
+                  </div>
+                  <div className="space-y-1">
+                      {formData.qualifications.map((q, i) => (
+                          <div key={i} className="flex justify-between items-center text-sm bg-white p-2 rounded border"><span className="text-slate-700 font-medium">{q.degree} <span className="text-slate-400 font-normal">from {q.college}</span></span><button type="button" onClick={()=>removeQual(i)} className="text-red-500"><X className="w-3 h-3"/></button></div>
+                      ))}
+                  </div>
+              </div>
+
+              <div className="space-y-1"><Label>Address</Label><Textarea id="address" value={formData.address} onChange={handleInputChange} className="min-h-[60px]" /></div>
+
+              <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isLoading}>{isLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : isEditing ? "Save Changes" : "Create Account"}</Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* ======================= LIST CARD ======================= */}
-        <Card className="bg-white/80 backdrop-blur-sm h-[800px] flex flex-col shadow-sm">
-          <CardHeader>
-            <CardTitle>Medical Staff Directory</CardTitle>
-            <CardDescription>Search and manage doctors</CardDescription>
-            <div className="relative mt-2">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search..." className="pl-8" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-            </div>
-          </CardHeader>
+        {/* List */}
+        <Card className="h-[850px] flex flex-col border-slate-200 shadow-sm">
+          <CardHeader><CardTitle>Staff Directory</CardTitle><div className="relative mt-2"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400"/><Input placeholder="Search doctor..." className="pl-9" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)}/></div></CardHeader>
           <CardContent className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            {isFetching ? (
-               <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>
-            ) : (
+            {isFetching ? <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-600"/></div> : (
                 <div className="space-y-3">
-                  {filteredDoctors.map((doc) => (
-                      <div key={doc._id} className="group flex items-start justify-between p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-all">
-                      <div className="flex gap-3">
-                          <div className="h-12 w-12 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100 overflow-hidden shrink-0">
-                              <img src={doc.image || `https://api.dicebear.com/6.x/initials/svg?seed=Dr ${doc.firstName}`} alt="Doc" className="object-cover h-full w-full" />
-                          </div>
-                          <div>
-                              <div className="flex items-center gap-2">
-                                  <h4 className="font-semibold text-gray-900">Dr. {doc.firstName} {doc.lastName}</h4>
-                                  <Badge variant="secondary" className="text-[10px] h-5 bg-indigo-50 text-indigo-700 font-mono">DID-{doc.doctorID}</Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground font-medium">{doc.department} • {doc.specialization}</p>
-                              {/* Display Qualifications */}
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {doc.qualification?.map((q, i) => (
-                                    <span key={i} className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">{q.degree}</span>
-                                ))}
-                              </div>
-                          </div>
-                      </div>
-                      <div className="flex flex-col gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50" onClick={() => handleEditClick(doc)}><Edit className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => handleDeleteDoctor(doc._id)}><Trash2 className="w-4 h-4" /></Button>
-                      </div>
-                      </div>
-                  ))}
+                    {filteredDoctors.map(doc => (
+                        <div key={doc._id} className="flex justify-between items-start p-4 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors bg-white">
+                            <div className="flex gap-4">
+                                <div className="h-10 w-10 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center font-bold text-sm border border-indigo-100">{doc.firstName?.[0]}{doc.lastName?.[0]}</div>
+                                <div>
+                                    <h4 className="font-semibold text-slate-800">Dr. {doc.firstName} {doc.lastName}</h4>
+                                    <p className="text-xs text-slate-500 font-medium">{doc.department} • {doc.specialization}</p>
+                                    <div className="flex gap-1 mt-1">{doc.qualification?.map((q,i)=><span key={i} className="text-[10px] bg-slate-100 px-1 rounded text-slate-600 border">{q.degree}</span>)}</div>
+                                </div>
+                            </div>
+                            <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" onClick={()=>handleEditClick(doc)} className="text-blue-600 h-8 w-8"><Edit className="w-4 h-4"/></Button>
+                                <Button variant="ghost" size="icon" onClick={()=>handleDelete(doc._id)} className="text-red-500 h-8 w-8"><Trash2 className="w-4 h-4"/></Button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
           </CardContent>

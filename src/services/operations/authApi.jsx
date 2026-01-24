@@ -11,6 +11,8 @@ const {
   LOGIN_API,
   RESETPASSTOKEN_API,
   RESETPASSWORD_API,
+  CHANGE_PASSWORD_API,
+  CONTACT_US_API
 } = endpoints
 
 
@@ -123,3 +125,56 @@ export function logout(navigate){
         navigate("/");
     }
 }
+
+
+export async function changePassword(token, formData) {
+  const toastId = toast.loading("Updating Password...");
+  try {
+    const response = await apiConnector(
+      "POST",
+      CHANGE_PASSWORD_API, // Make sure this route maps to the controller above
+      formData,
+      { Authorization: `Bearer ${token}` }
+    );
+
+    if (!response.data.success) {
+      throw new Error(response.data.message);
+    }
+
+    toast.success("Password Changed Successfully");
+    return true; 
+
+  } catch (error) {
+    console.log("CHANGE PASSWORD API ERROR............", error);
+    toast.error(error.response?.data?.message || "Failed to change password");
+    return false;
+  } finally {
+    toast.dismiss(toastId);
+  }
+};
+
+
+
+export const contactUsApi = async (data, setLoading) => {
+  const toastId = toast.loading("Sending message...");
+  setLoading(true);
+  
+  try {
+    const response = await apiConnector("POST", CONTACT_US_API, data);
+
+    console.log("CONTACT_US_API RESPONSE:", response);
+
+    if (!response.data.success) {
+      throw new Error(response.data.message);
+    }
+
+    toast.success("Message Sent Successfully!");
+    
+  } catch (error) {
+    console.log("CONTACT_US_API ERROR:", error);
+    toast.error(error.response?.data?.message || "Could not send message");
+  }
+  
+  setLoading(false);
+  toast.dismiss(toastId);
+};

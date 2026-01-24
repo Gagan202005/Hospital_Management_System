@@ -1,23 +1,17 @@
 import { useEffect, useState } from "react";
 import { 
-  Calendar, 
-  Activity, 
-  FileText,
-  Clock,
-  Download,
-  Eye,
-  User,
-  ExternalLink,
-  Pill,
-  Paperclip
+  CalendarCheck, Activity, FileBarChart, Clock, 
+  Search, CalendarPlus, Eye, AlertCircle, FileText 
 } from "lucide-react";
 import { Button } from "../../ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { ScrollArea } from "../../ui/scroll-area";
-import { Separator } from "../../ui/separator";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+
+// Reuse the Report Viewer Component Logic
+import { ViewReportContent } from "./PatientAppointmentSection"; 
 
 // API
 import { fetchPatientDashboardStats } from "../../../services/operations/PatientApi";
@@ -30,280 +24,215 @@ export default function PatientOverview() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // View Report Modal State
+  // Modal State
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
 
+  // --- Data Fetching ---
   useEffect(() => {
     const loadStats = async () => {
       setLoading(true);
       if (token) {
-        const data = await fetchPatientDashboardStats(token);
-        if (data) setStats(data);
+        try {
+            const data = await fetchPatientDashboardStats(token);
+            if (data) setStats(data);
+        } catch (error) {
+            console.error("Dashboard Load Error", error);
+        }
       }
       setLoading(false);
     };
     loadStats();
   }, [token]);
 
+  // --- Helper: Fetch Full Report Details ---
   const handleViewReport = async (reportId) => {
-    // We might have the data in 'stats.recentReports', but fetching fresh ensures full details
-    const data = await fetchVisitReport(token, reportId); // Reusing the MedicalReportApi function
+    const data = await fetchVisitReport(token, reportId);
     if (data) {
       setSelectedReport(data);
       setIsReportOpen(true);
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading dashboard...</div>;
-  if (!stats) return <div className="p-8 text-center">Failed to load data.</div>;
+  // --- Helper: Time-based Greeting ---
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
+  };
+
+  if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Initializing Medical Dashboard...</div>;
+  if (!stats) return <div className="p-12 text-center text-red-500">System temporarily unavailable.</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Patient Dashboard</h1>
-        <div className="text-sm text-muted-foreground">
-          Welcome back, {stats.patientName}
+    <div className="space-y-8">
+      
+      {/* 1. Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Medical Summary</h1>
+          <p className="text-slate-500 mt-1">
+            {getGreeting()}, <span className="font-semibold text-emerald-700">{stats.patientName}</span>. 
+            Here is your health snapshot for {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
+          </p>
+        </div>
+        <div className="flex gap-2">
+            <Button onClick={() => navigate("/find-doctor")} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+                <Search className="w-4 h-4 mr-2" /> Find Specialist
+            </Button>
         </div>
       </div>
 
+      {/* 2. Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Upcoming Count */}
-        <Card className="shadow-card">
+        {/* Scheduled Visits */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow border-t-4 border-t-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Upcoming Appointments</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-600">Scheduled Visits</CardTitle>
+            <CalendarCheck className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.upcomingCount}</div>
-            <p className="text-xs text-muted-foreground">Scheduled visits</p>
+            <div className="text-3xl font-bold text-slate-800">{stats.upcomingCount}</div>
+            <p className="text-xs text-slate-500 mt-1">Upcoming consultations</p>
           </CardContent>
         </Card>
 
-        {/* Total Reports */}
-        <Card className="shadow-card">
+        {/* Clinical Reports */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow border-t-4 border-t-purple-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recent Reports</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-600">Clinical Reports</CardTitle>
+            <FileBarChart className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.recentReports?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">Latest available</p>
+            <div className="text-3xl font-bold text-slate-800">{stats.recentReports?.length || 0}</div>
+            <p className="text-xs text-slate-500 mt-1">Available for download</p>
           </CardContent>
         </Card>
 
-        {/* Latest Vitals (Replaces Generic Health Score) */}
-        <Card className="shadow-card">
+        {/* Clinical Vitals */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow border-t-4 border-t-red-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Latest Vitals</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-600">Latest Vitals</CardTitle>
+            <Activity className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
             {stats.latestVitals ? (
                 <div>
-                    <div className="text-xl font-bold">{stats.latestVitals.bp || "--"}</div>
-                    <p className="text-xs text-muted-foreground">BP | {stats.latestVitals.weight || "--"} kg</p>
+                    <div className="text-2xl font-bold text-slate-800">{stats.latestVitals.bp || "--"} <span className="text-sm font-normal text-slate-400">mmHg</span></div>
+                    <p className="text-xs text-slate-500 mt-1">Weight: {stats.latestVitals.weight || "--"} kg</p>
                 </div>
             ) : (
                 <div>
-                    <div className="text-xl font-bold">--</div>
-                    <p className="text-xs text-muted-foreground">No records yet</p>
+                    <div className="text-xl font-bold text-slate-400">--</div>
+                    <p className="text-xs text-slate-500">No recent vitals recorded</p>
                 </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Last Visit */}
-        <Card className="shadow-card">
+        {/* Last Interaction */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow border-t-4 border-t-emerald-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Last Visit</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-600">Last Consultation</CardTitle>
+            <Clock className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold truncate">{stats.lastVisit}</div>
-            <p className="text-xs text-muted-foreground">Checkup</p>
+            <div className="text-lg font-bold text-slate-800 truncate">{stats.lastVisit || "N/A"}</div>
+            <p className="text-xs text-slate-500 mt-1">Check-up date</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Quick Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button 
-              onClick={() => navigate("/find-doctor")} 
-              className="w-full justify-start"
-              variant="outline"
-            >
-              <User className="h-4 w-4 mr-2" />
-              Find a Doctor
-            </Button>
-            <Button 
-              onClick={() => navigate("/patient-dashboard/appointments")} 
-              className="w-full justify-start"
-              variant="outline"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Manage Appointments
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* 3. Next Appointment Card */}
+        <div className="lg:col-span-2">
+            <Card className="h-full border-slate-200 shadow-sm">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <CalendarPlus className="w-5 h-5 text-emerald-600"/> Next Scheduled Consultation
+                    </CardTitle>
+                    <CardDescription>Details of your upcoming medical visit.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {stats.nextAppointment ? (
+                        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 p-6 rounded-xl border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="bg-emerald-200 text-emerald-800 text-[10px] uppercase font-bold px-2 py-1 rounded">Confirmed</span>
+                                    <span className="text-sm text-emerald-900 font-medium">{new Date(stats.nextAppointment.date).toLocaleDateString()}</span>
+                                </div>
+                                <h3 className="font-bold text-xl text-emerald-950">Dr. {stats.nextAppointment.doctor?.firstName} {stats.nextAppointment.doctor?.lastName}</h3>
+                                <p className="text-sm text-emerald-700 mt-1">{stats.nextAppointment.doctor?.department || "General Physician"} • {stats.nextAppointment.doctor?.specialization}</p>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-3xl font-bold text-emerald-600">{stats.nextAppointment.timeSlot}</div>
+                                <p className="text-xs text-emerald-500 uppercase font-semibold tracking-wider mt-1">Time Slot</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                            <CalendarCheck className="h-12 w-12 mb-3 opacity-20"/>
+                            <p>No upcoming appointments scheduled.</p>
+                            <Button variant="link" onClick={() => navigate("/find-doctor")} className="text-emerald-600">Book Now</Button>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
 
-        {/* Up Next (Replaces Generic Activity) */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle>Up Next</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {stats.nextAppointment ? (
-                <div className="bg-primary/5 p-4 rounded-lg border border-primary/10">
-                    <div className="flex justify-between items-start mb-2">
-                        <div>
-                            <h3 className="font-semibold text-lg">Dr. {stats.nextAppointment.doctor?.firstName} {stats.nextAppointment.doctor?.lastName}</h3>
-                            <p className="text-sm text-muted-foreground">Specialist Checkup</p>
-                        </div>
-                        <div className="bg-primary/10 text-primary px-3 py-1 rounded text-xs font-bold">
-                            {stats.nextAppointment.timeSlot}
-                        </div>
-                    </div>
-                    <div className="text-sm font-medium">
-                        {new Date(stats.nextAppointment.date).toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    </div>
-                </div>
-            ) : (
-                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                    <Calendar className="h-10 w-10 mb-2 opacity-20"/>
-                    <p>No upcoming appointments</p>
-                </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* 4. Recent Reports List */}
+        <div>
+            <Card className="h-full border-slate-200 shadow-sm">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <FileText className="w-5 h-5 text-purple-600"/> Recent Reports
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="px-2">
+                    <ScrollArea className="h-[300px] pr-4">
+                        {stats.recentReports && stats.recentReports.length > 0 ? (
+                            <div className="space-y-3">
+                                {stats.recentReports.map((report) => (
+                                    <div key={report._id} className="group p-3 rounded-lg border border-slate-100 hover:bg-slate-50 hover:border-slate-200 transition-all cursor-pointer" onClick={() => handleViewReport(report.appointmentId)}>
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <h4 className="font-semibold text-sm text-slate-800">{report.diagnosis || "Medical Checkup"}</h4>
+                                                <p className="text-xs text-slate-500 mt-1">Dr. {report.doctor?.lastName}</p>
+                                            </div>
+                                            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{new Date(report.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 mt-2 text-xs text-blue-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Eye className="w-3 h-3" /> View Report
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-sm text-slate-500">
+                                No records found.
+                            </div>
+                        )}
+                    </ScrollArea>
+                </CardContent>
+            </Card>
+        </div>
       </div>
-
-      {/* Recent Medical Reports */}
-      <Card className="shadow-card">
-        <CardHeader>
-          <CardTitle>Latest Medical Reports</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {stats.recentReports && stats.recentReports.length > 0 ? (
-                stats.recentReports.map((report) => (
-                    <div key={report._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-border rounded-lg hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-3 mb-3 sm:mb-0">
-                        <div className="h-10 w-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
-                            <FileText className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{report.diagnosis || "General Checkup"}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Dr. {report.doctor?.firstName} {report.doctor?.lastName} • {new Date(report.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 w-full sm:w-auto">
-                        <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => handleViewReport(report.appointmentId)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                ))
-            ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                    No medical reports available.
-                </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* --- VIEW REPORT MODAL --- */}
       <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
-        <DialogContent className="max-w-3xl h-[90vh] flex flex-col p-0">
-            <DialogHeader className="p-6 pb-4 border-b shrink-0">
-                <DialogTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-green-600" /> Medical Report Details
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
+            <DialogHeader className="p-5 border-b bg-slate-50 flex flex-row items-center justify-between shrink-0">
+                <DialogTitle className="flex items-center gap-2 text-lg text-slate-800">
+                    <Activity className="h-5 w-5 text-purple-600" /> Digital Health Record
                 </DialogTitle>
             </DialogHeader>
-            <ScrollArea className="flex-1 p-6">
+            <ScrollArea className="flex-1 p-6 bg-white">
                 {selectedReport && <ViewReportContent data={selectedReport} />}
             </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
   );
-}
-
-// Reuse this component logic from AppointmentSection
-function ViewReportContent({ data }) {
-    const downloadFile = async (url, filename) => {
-        try {
-            const response = await fetch(url);
-            if(!response.ok) throw new Error("Network response was not ok");
-            const blob = await response.blob();
-            const blobUrl = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = filename || 'download';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(blobUrl);
-        } catch (error) {
-            window.open(url, '_blank');
-        }
-    };
-
-    return (
-        <div className="space-y-6 pb-4">
-            <div className="flex justify-between bg-muted/20 p-4 rounded-lg">
-                <div><p className="text-xs text-muted-foreground uppercase">Doctor</p><p className="font-semibold">Dr. {data.doctor?.firstName} {data.doctor?.lastName}</p></div>
-                <div><p className="text-xs text-muted-foreground uppercase">Date</p><p className="font-semibold">{new Date(data.createdAt).toLocaleDateString()}</p></div>
-            </div>
-            <div className="grid grid-cols-5 gap-2 text-center">
-                {Object.entries(data.vitalSigns || {}).map(([key, val]) => (
-                    val && <div key={key} className="border p-2 rounded"><p className="text-xs text-muted-foreground uppercase">{key}</p><p className="font-medium">{val}</p></div>
-                ))}
-            </div>
-            <Separator />
-            <div><h4 className="font-semibold text-primary mb-1">Diagnosis</h4><p className="text-lg font-medium">{data.diagnosis}</p><p className="text-sm text-muted-foreground">{data.symptoms}</p></div>
-            <Separator />
-            <div>
-                <h4 className="font-semibold flex items-center gap-2 mb-3 text-sm"><Paperclip className="w-4 h-4"/> Lab Reports</h4>
-                {data.labReports?.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {data.labReports.map((file, i) => (
-                            <div key={i} className="flex justify-between items-center p-3 border rounded bg-muted/10">
-                                <div className="flex items-center gap-2 overflow-hidden"><FileText className="w-4 h-4 text-blue-500 shrink-0"/><span className="text-sm truncate font-medium">{file.originalName}</span></div>
-                                <div className="flex gap-1 shrink-0">
-                                    <Button variant="ghost" size="icon" onClick={() => window.open(file.url, '_blank')}><ExternalLink className="w-4 h-4"/></Button>
-                                    <Button variant="ghost" size="icon" onClick={() => downloadFile(file.url, file.originalName)}><Download className="w-4 h-4"/></Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : <p className="text-sm text-muted-foreground italic">No files attached.</p>}
-            </div>
-            <Separator />
-            <div className="space-y-2">
-                <h4 className="font-semibold flex items-center gap-2 mb-3 text-sm"><Pill className="w-4 h-4"/> Prescription</h4>
-                {data.prescription?.map((med, i) => (
-                    <div key={i} className="flex justify-between bg-muted/10 p-2 rounded text-sm"><span className="font-semibold w-1/3">{med.medicineName}</span><span className="text-muted-foreground">{med.dosage} | {med.frequency} | {med.duration} | <span className="italic">{med.instructions}</span></span></div>
-                ))}
-            </div>
-            {data.patientAdvice && (
-                <div className="bg-blue-50 p-4 rounded-md border border-blue-100 mt-4">
-                    <h4 className="text-sm font-semibold text-blue-800 mb-1">Advice</h4>
-                    <p className="text-sm text-blue-700 whitespace-pre-wrap">{data.patientAdvice}</p>
-                </div>
-            )}
-        </div>
-    )
 }

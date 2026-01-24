@@ -1,292 +1,223 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "../../ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "../../ui/card";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Calendar } from "../../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { format } from "date-fns";
-import { CalendarIcon, ArrowLeft, User, Loader2 } from "lucide-react";
+import { CalendarIcon, ArrowLeft, User, Loader2, IndianRupee, AlertCircle, LogIn, Lock } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { useToast } from "../../../hooks/use-toast";
 import { useSelector } from "react-redux";
-// Import API Services
-import { fetchDoctorDetails } from "../../../services/operations/DoctorApi";
-import { fetchTimeSlotsbyDate, bookAppointmentApi } from "../../../services/operations/DoctorApi";
+import Navbar from "../../Common/Navbar";
+import Footer from "../../Common/Footer";
+
+// API
+import { fetchDoctorDetails, fetchTimeSlotsbyDate, bookAppointmentApi } from "../../../services/operations/DoctorApi";
+
 const BookAppointment = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-const { token } = useSelector((state) => state.auth);
-  // --- States ---
+  const { token, user } = useSelector((state) => state.auth);
+
+  // Data States
   const [doctor, setDoctor] = useState(null);
-  const [loadingDoctor, setLoadingDoctor] = useState(true);
-  
-  // Slot States
-  const [availableSlots, setAvailableSlots] = useState([]); // Stores objects: [{_id, startTime}]
+  const [availableSlots, setAvailableSlots] = useState([]); 
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   // Form States
   const [selectedDate, setSelectedDate] = useState();
-  const [selectedSlotId, setSelectedSlotId] = useState(""); // Stores ID
-  const [displayTime, setDisplayTime] = useState(""); // Stores String (e.g., "10:00 AM") for summary
+  const [selectedSlotId, setSelectedSlotId] = useState(""); 
+  const [displayTime, setDisplayTime] = useState(""); 
   const [isBooking, setIsBooking] = useState(false);
   
   const [formData, setFormData] = useState({
-    firstName: "", 
-    lastName: "", 
-    email: "", 
-    phone: "", 
+    firstName: user?.firstName || "", 
+    lastName: user?.lastName || "", 
+    email: user?.email || "", 
+    phone: user?.phoneno || "", 
     reason: "", 
     symptoms: ""
   });
 
-  // --- 1. Fetch Doctor Details ---
+  // --- 1. Load Doctor ---
   useEffect(() => {
     const loadDoctor = async () => {
-      try {
-        const data = await fetchDoctorDetails(id);
-        if (data) {
-           setDoctor({
-             id: data._id,
-             name: `${data.firstName} ${data.lastName}`,
-             specialty: data.specialization,
-             image: data.image,
-             location: data.address || "Main Hospital",
-             consultationFee: data.consultationFee
-           });
-        }
-      } catch (error) {
-        console.error("Doctor Load Error", error);
-        toast({ title: "Error", description: "Failed to load doctor", variant: "destructive" });
-      } finally {
-        setLoadingDoctor(false);
-      }
+      const data = await fetchDoctorDetails(id);
+      if (data) setDoctor(data);
     };
     if (id) loadDoctor();
-  }, [id, toast]);
+  }, [id]);
 
-  // --- 2. Fetch Time Slots ---
+  // --- 2. Load Slots ---
   useEffect(() => {
     const loadSlots = async () => {
       if (!selectedDate || !id) return;
-      
-      setLoadingSlots(true);
-      setSelectedSlotId(""); 
-      setDisplayTime("");
-      setAvailableSlots([]); 
-      
+      setLoadingSlots(true); setSelectedSlotId(""); setDisplayTime("");
       try {
-        const formattedDate = format(selectedDate, "yyyy-MM-dd");
-        const slots = await fetchTimeSlotsbyDate(id, formattedDate);
+        const slots = await fetchTimeSlotsbyDate(id, format(selectedDate, "yyyy-MM-dd"));
         setAvailableSlots(slots || []);
-      } catch (error) {
-        console.error("Slot Load Error", error);
-      } finally {
-        setLoadingSlots(false);
-      }
+      } catch (error) { console.error(error); } 
+      finally { setLoadingSlots(false); }
     };
-
     loadSlots();
   }, [selectedDate, id]);
 
-  // --- Handlers ---
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSlotChange = (slotId) => {
-    setSelectedSlotId(slotId);
-    // Find the readable time string for the summary view
-    const slot = availableSlots.find(s => s._id === slotId);
-    if (slot) setDisplayTime(slot.startTime);
-  };
-
-  const handleBookAppointment = async () => {
-    if (!selectedDate || !selectedSlotId || !formData.firstName || !formData.email || !formData.phone) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields marked with *.",
-        variant: "destructive"
-      });
-      return;
-    }
+  const handleBook = async () => {
+    if (!token) { toast.error("Please login first"); return navigate("/login"); }
+    if (!selectedDate || !selectedSlotId || !formData.reason) { return toast.error("Please fill all required fields"); }
 
     setIsBooking(true);
-
-    const bookingPayload = {
-      doctorId: id,
-      date: format(selectedDate, "yyyy-MM-dd"),
-      timeSlotId: selectedSlotId, // Send ID to backend
-      ...formData
-    };
-
-    await bookAppointmentApi(bookingPayload,token, navigate);
+    const payload = { doctorId: id, date: format(selectedDate, "yyyy-MM-dd"), timeSlotId: selectedSlotId, ...formData };
+    await bookAppointmentApi(payload, token, navigate);
     setIsBooking(false);
   };
 
-  // --- Loading/Error Views ---
-  if (loadingDoctor) {
-    return <div className="min-h-screen flex justify-center items-center"><Loader2 className="animate-spin w-10 h-10 text-primary" /></div>;
-  }
-
-  if (!doctor) {
-    return <div className="min-h-screen flex items-center justify-center">Doctor Not Found</div>;
-  }
-
-  // --- Main Render ---
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-primary/5 to-secondary/5 border-b">
-        <div className="container mx-auto px-4 py-6">
-          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div className="flex items-center gap-4">
-            <img src={doctor.image} alt={doctor.name} className="w-16 h-16 rounded-full object-cover border-2 bg-white" />
-            <div>
-              <h1 className="text-2xl font-bold">Book Appointment with Dr. {doctor.name}</h1>
-              <p className="text-muted-foreground">{doctor.specialty} • {doctor.location}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
-          
-          {/* Left: Form */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader><CardTitle className="flex gap-2"><User className="w-5 h-5"/> Patient Details</CardTitle></CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>First Name *</Label>
-                    <Input value={formData.firstName} onChange={(e) => handleInputChange("firstName", e.target.value)} placeholder="John" />
-                  </div>
-                  <div>
-                    <Label>Last Name</Label>
-                    <Input value={formData.lastName} onChange={(e) => handleInputChange("lastName", e.target.value)} placeholder="Doe" />
-                  </div>
-                </div>
-                
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Email *</Label>
-                    <Input type="email" value={formData.email} onChange={(e) => handleInputChange("email", e.target.value)} placeholder="john@example.com" />
-                  </div>
-                  <div>
-                    <Label>Phone *</Label>
-                    <Input value={formData.phone} onChange={(e) => handleInputChange("phone", e.target.value)} placeholder="(555) 000-0000" />
-                  </div>
-                </div>
-
-                <div className="h-px bg-border my-2" />
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Date Picker */}
-                  <div>
-                    <Label className="mb-2 block">Date *</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+  // --- Guest View ---
+  if (!token) {
+      return (
+        <div className="flex flex-col min-h-screen bg-slate-50">
+            <div className="fixed top-0 w-full z-50"><Navbar /></div>
+            <main className="flex-1 flex items-center justify-center pt-20 px-4">
+                <Card className="max-w-md w-full text-center p-6 shadow-lg border-t-4 border-t-blue-600">
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600">
+                        <Lock className="w-8 h-8" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Login Required</h2>
+                    <p className="text-slate-500 mb-6">To ensure secure medical records, you must be logged in to book an appointment.</p>
+                    <div className="space-y-3">
+                        <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => navigate("/login")}>
+                            <LogIn className="w-4 h-4 mr-2" /> Login
                         </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} disabled={(date) => date < new Date() || date.getDay() === 0} initialFocus />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  
-                  {/* Time Slot Select (Value = ID, Label = Time) */}
-                  <div>
-                    <Label className="mb-2 block">Time Slot *</Label>
-                    <Select 
-                      value={selectedSlotId} 
-                      onValueChange={handleSlotChange} // Updates ID and DisplayTime
-                      disabled={!selectedDate || loadingSlots}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={!selectedDate ? "Select Date First" : loadingSlots ? "Loading..." : "Select Time"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableSlots.length > 0 ? (
-                            availableSlots.map((slot) => (
-                              <SelectItem key={slot._id} value={slot._id}>
-                                {slot.startTime} 
-                              </SelectItem>
-                            ))
-                        ) : (
-                            <div className="p-3 text-sm text-center text-muted-foreground">
-                                {selectedDate ? "No available slots" : "Please select a date"}
-                            </div>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div>
-                   <Label>Reason for Visit</Label>
-                   <Input value={formData.reason} onChange={(e) => handleInputChange("reason", e.target.value)} placeholder="Reason..." />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right: Summary */}
-          <div>
-            <Card className="sticky top-6">
-              <CardHeader className="bg-muted/30"><CardTitle>Summary</CardTitle></CardHeader>
-              <CardContent className="space-y-4 pt-6">
-                <div className="flex items-center gap-3 border-b pb-4">
-                  <img src={doctor.image} alt="doc" className="w-12 h-12 rounded-full object-cover bg-white border" />
-                  <div>
-                    <div className="font-medium text-sm">Dr. {doctor.name}</div>
-                    <div className="text-xs text-muted-foreground">{doctor.specialty}</div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Date:</span>
-                    <span className="font-medium">{selectedDate ? format(selectedDate, "PPP") : "--"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Time:</span>
-                    <span className="font-medium">{displayTime || "--"}</span>
-                  </div>
-                </div>
-
-                <div className="bg-primary/5 p-4 rounded-lg mt-2 border border-primary/10">
-                  <div className="flex justify-between items-center font-bold">
-                    <span>Total Fee</span>
-                    <span className="text-primary text-lg">${doctor.consultationFee}</span>
-                  </div>
-                </div>
-                
-                <Button 
-                  className="w-full mt-2" 
-                  size="lg"
-                  variant="appointment"
-                  onClick={handleBookAppointment}
-                  disabled={isBooking || !selectedDate || !selectedSlotId}
-                >
-                  {isBooking ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : "Confirm Booking"}
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
+                        <Button variant="outline" className="w-full" onClick={() => navigate("/signup")}>Create Account</Button>
+                    </div>
+                </Card>
+            </main>
+            <Footer />
         </div>
-      </div>
+      );
+  }
+
+  if (!doctor) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600"/></div>;
+
+  return (
+    <div className="flex flex-col min-h-screen bg-slate-50 mt-[122px]">
+      <div className="fixed top-0 w-full z-50"><Navbar /></div>
+
+      <main className="flex-1 pt-14">
+        {/* Header */}
+        <div className="bg-white border-b border-slate-200 py-6">
+            <div className="container mx-auto px-4">
+                <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4 text-slate-500 hover:text-slate-900 p-0 hover:bg-transparent">
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                </Button>
+                <div className="flex items-center gap-4">
+                    <img src={doctor.image} className="w-16 h-16 rounded-full object-cover border border-slate-200"/>
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">Book Appointment</h1>
+                        <p className="text-slate-500">Dr. {doctor.firstName} {doctor.lastName} • {doctor.specialization}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div className="container mx-auto px-4 py-8">
+            <div className="grid lg:grid-cols-3 gap-8">
+                
+                {/* FORM */}
+                <div className="lg:col-span-2 space-y-6">
+                    <Card className="shadow-sm border-slate-200">
+                        <CardHeader><CardTitle className="text-lg flex gap-2 items-center"><CalendarIcon className="w-5 h-5 text-blue-600"/> Select Schedule</CardTitle></CardHeader>
+                        <CardContent className="grid md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <Label>Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-2 h-4 w-4" /> {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} disabled={(date) => date < new Date()} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Time Slot</Label>
+                                <Select value={selectedSlotId} onValueChange={(val) => {setSelectedSlotId(val); setDisplayTime(availableSlots.find(s=>s._id===val)?.startTime);}} disabled={!selectedDate || loadingSlots}>
+                                    <SelectTrigger><SelectValue placeholder={loadingSlots ? "Loading..." : "Select Time"} /></SelectTrigger>
+                                    <SelectContent>
+                                        {availableSlots.length > 0 ? availableSlots.map(s => <SelectItem key={s._id} value={s._id}>{s.startTime}</SelectItem>) : <SelectItem disabled>No slots available</SelectItem>}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="shadow-sm border-slate-200">
+                        <CardHeader><CardTitle className="text-lg flex gap-2 items-center"><User className="w-5 h-5 text-blue-600"/> Personal Details</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label>First Name</Label><Input value={formData.firstName} onChange={(e)=>setFormData({...formData, firstName:e.target.value})} disabled className="bg-slate-50"/></div>
+                                <div className="space-y-2"><Label>Last Name</Label><Input value={formData.lastName} onChange={(e)=>setFormData({...formData, lastName:e.target.value})} disabled className="bg-slate-50"/></div>
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label>Email</Label><Input value={formData.email} onChange={(e)=>setFormData({...formData, email:e.target.value})} disabled className="bg-slate-50"/></div>
+                                <div className="space-y-2"><Label>Phone</Label><Input value={formData.phone} onChange={(e)=>setFormData({...formData, phone:e.target.value})} disabled className="bg-slate-50"/></div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Reason for Visit *</Label>
+                                <Input value={formData.reason} onChange={(e)=>setFormData({...formData, reason:e.target.value})} placeholder="e.g. Fever, Consultation"/>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Symptoms (Optional)</Label>
+                                <Input value={formData.symptoms} onChange={(e)=>setFormData({...formData, symptoms:e.target.value})} placeholder="Briefly describe..."/>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* SUMMARY SIDEBAR */}
+                <div>
+                    <Card className="sticky top-20 shadow-lg border-t-4 border-t-blue-600">
+                        <CardHeader className="bg-slate-50/50 pb-4">
+                            <CardTitle>Booking Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-4">
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between"><span className="text-slate-500">Date</span><span className="font-medium">{selectedDate ? format(selectedDate, "PPP") : "--"}</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500">Time</span><span className="font-medium">{displayTime || "--"}</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500">Consultation Fee</span><span className="font-medium flex items-center"><IndianRupee className="w-3 h-3"/> {doctor.consultationFee}</span></div>
+                            </div>
+                            
+                            <div className="bg-green-50 border border-green-100 rounded-lg p-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-green-700 text-sm font-medium">To Pay Now</span>
+                                    <span className="text-green-700 font-bold text-lg flex items-center"><IndianRupee className="w-4 h-4"/> 0</span>
+                                </div>
+                                <p className="text-[10px] text-green-600 mt-1">Pay consultation fee at the hospital counter.</p>
+                            </div>
+
+                            <div className="flex items-start gap-2 bg-blue-50 p-3 rounded-lg text-xs text-blue-700">
+                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                <span>Your request will be pending confirmation. You will receive an email update shortly.</span>
+                            </div>
+
+                            <Button className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-lg" onClick={handleBook} disabled={isBooking || !selectedDate || !selectedSlotId}>
+                                {isBooking ? <Loader2 className="animate-spin mr-2"/> : "Confirm Booking"}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+
+            </div>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 };

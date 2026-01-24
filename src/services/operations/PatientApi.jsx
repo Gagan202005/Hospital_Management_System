@@ -10,63 +10,108 @@ const {
   PATIENT_UPDATEDISPLAYPICTURE_API,PATIENT_APPOINTMENTS_API,GET_PATIENT_DASHBOARD_API
 } = profendpoints
 
-export async function updateprofile(profile,token,dispatch){
-        try{
-            const {firstName,lastName,phoneno}=profile;
-            let DOB = (((profile.DOB === "ADD DOB") || (profile.DOB === "N/A") || !profile.DOB ) ? null : profile.DOB) ;
-            let gender = (profile.gender === "ADD GENDER" ? null : profile.gender) ;
-            let address = (profile.address === "ADD ADDRESS" ? "" : profile.address) ;
-            let bloodgroup = (profile.bloodgroup === "ADD BLOODGROUP" ? null : profile.bloodgroup) ;
-            let emergencyContactName = (profile.emergencyContactName === "ADD NAME" ? "" : profile.emergencyContactName) ;
-            let emergencyContactPhone = (profile.emergencyContactPhone === "ADD CONTACT NUMBER" ? "" : profile.emergencyContactPhone) ;
+// =============================================
+// UPDATE PROFILE TEXT DATA
+// =============================================
+export async function updateprofile(profile, token, dispatch) {
+  dispatch(setLoading(true));
+  try {
+    // 1. Destructure all fields from the profile object passed from the component
+    const { 
+      firstName, 
+      lastName, 
+      email, 
+      phoneno 
+    } = profile;
 
+    // 2. Data Cleaning: Convert "ADD..." placeholders or missing values to null/empty string
+    // This ensures we don't save "ADD ADDRESS" into the database
+    const DOB = (profile.DOB === "ADD DOB" || !profile.DOB) ? null : profile.DOB;
+    const gender = (profile.gender === "ADD GENDER") ? null : profile.gender;
+    const address = (profile.address === "ADD ADDRESS") ? "" : profile.address;
+    const bloodgroup = (profile.bloodgroup === "ADD BLOODGROUP") ? null : profile.bloodgroup;
+    const emergencyContactName = (profile.emergencyContactName === "ADD NAME") ? "" : profile.emergencyContactName;
+    const emergencyContactPhone = (profile.emergencyContactPhone === "ADD CONTACT NUMBER") ? "" : profile.emergencyContactPhone;
 
-            dispatch(setLoading(true));
-            const response = await apiConnector("POST",PATIENT_EDITPROFILE_API,{firstName,lastName,DOB,gender,phoneno,address,bloodgroup,emergencyContactName,emergencyContactPhone},{
-                Authorization: `Bearer ${token}`,
-            });
-            dispatch(setProgress(100));
+    // 3. API Call
+    const response = await apiConnector(
+      "POST",
+      PATIENT_EDITPROFILE_API,
+      {
+        firstName,
+        lastName,
+        email, // Added Email
+        phoneno,
+        DOB,
+        gender,
+        address,
+        bloodgroup,
+        emergencyContactName,
+        emergencyContactPhone
+      },
+      {
+        Authorization: `Bearer ${token}`,
+      }
+    );
 
-            if(response.data.success){
-                toast.success("Profile Updated Successfully");
-                console.log(response);
-                localStorage.setItem("user",JSON.stringify(response.data.profile));
-                dispatch(setUser(response.data.profile));
-            }
-            else{
-                throw new Error(response.data.message)
-            }
-        }
-        catch(error){
-            console.log("editprofile API ERROR............", error)
-            toast.error(error?.response?.data?.message || "Profile update failed");
-            dispatch(setProgress(100));
-        }
-        dispatch(setLoading(false))
+    // 4. Handle Success
+    if (!response.data.success) {
+      throw new Error(response.data.message);
+    }
+
+    toast.success("Profile Updated Successfully");
+    
+    // 5. Update Local Storage & Redux
+    // We update the user in storage so a refresh keeps the new data
+    const userImage = JSON.parse(localStorage.getItem("user"))?.image;
+    const updatedUser = { ...response.data.profile, image: userImage }; // Ensure image persists if backend didn't return it
+    
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+    dispatch(setUser(updatedUser));
+
+  } catch (error) {
+    console.log("UPDATE PROFILE API ERROR............", error);
+    toast.error(error?.response?.data?.message || "Profile update failed");
+  }
+  dispatch(setLoading(false));
 }
 
-//updateProfilePicture
-export async function UpdatePfp(token,pfp,accountType,dispatch){
+// =============================================
+// UPDATE PROFILE PICTURE
+// =============================================
+export async function UpdatePfp(token, pfpFile, accountType, dispatch) {
   const toastId = toast.loading("Uploading...");
   try {
     const formData = new FormData();
-    console.log("pfp",pfp)
-    formData.append('pfp',pfp);
-    const response = await apiConnector("POST", PATIENT_UPDATEDISPLAYPICTURE_API, formData, {
-      Authorization: `Bearer ${token}`
-    });
-    console.log("UPDATE_DISPLAY_PICTURE_API API RESPONSE............", response)
+    formData.append('pfp', pfpFile);
+
+    const response = await apiConnector(
+      "POST", 
+      PATIENT_UPDATEDISPLAYPICTURE_API, 
+      formData, 
+      {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${token}`
+      }
+    );
+
     if (!response.data.success) {
-      throw new Error(response.data.message)
+      throw new Error(response.data.message);
     }
-    toast.success("Profile Picture Updated Successfully");
+
+    toast.success("Profile Picture Updated");
+    
+    // Update Image URL in Redux/Local Storage
     const imageUrl = response.data.data.image;
-    localStorage.setItem("user",JSON.stringify({...JSON.parse(localStorage.getItem("user")),image:imageUrl}));
-    dispatch(setUser({...JSON.parse(localStorage.getItem("user")),image:imageUrl}));
-    console.log(JSON.parse(localStorage.getItem("user")).image);
+    const currentUser = JSON.parse(localStorage.getItem("user"));
+    const updatedUser = { ...currentUser, image: imageUrl };
+
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+    dispatch(setUser(updatedUser));
+
   } catch (error) {
-    console.log("UPDATE_DISPLAY_PICTURE_API API ERROR............", error)
-    toast.error(error?.response?.data?.message || "Profile picture update failed");
+    console.log("UPDATE PFP API ERROR............", error);
+    toast.error(error?.response?.data?.message || "Could not update image");
   }
   toast.dismiss(toastId);
 }

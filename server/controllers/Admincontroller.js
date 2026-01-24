@@ -8,7 +8,9 @@ const Nurse = require("../models/Nurse");
 const Ambulance = require("../models/Ambulance");
 const Slot = require("../models/Slot");
 const mailSender = require("../utils/mailSender");
+const MedicalRecord = require("../models/Medicalrecord");
 const nodeCrypto = require("crypto");
+const cloudinary = require("cloudinary").v2;
 const { accountCreationEmail } = require("../mail/templates/AccountCreationMail");
 require("dotenv").config();
 
@@ -121,14 +123,70 @@ exports.updateDoctor = async (req, res) => {
         return res.status(500).json({ success: false, message: "Failed to update doctor" });
     }
 };
-// ... keep deleteDoctor and getAllUsers as they were ...
+// ==========================================
+// DELETE DOCTOR (Full Cleanup)
+// ==========================================
 exports.deleteDoctor = async (req, res) => {
     try {
         const { id } = req.body; 
+
+        // 1. Find Doctor
+        const doctor = await Doctor.findById(id);
+        if (!doctor) {
+            return res.status(404).json({ success: false, message: "Doctor not found" });
+        }
+
+        // 2. DELETE TIME SLOTS
+        // Deletes all availability slots for this doctor
+        await Slot.deleteMany({ doctorId: id }); // Using 'doctorId' based on your TimeSlot schema
+
+        // 3. DELETE APPOINTMENTS & CLEAN PATIENT REFERENCES
+        const appointments = await Appointment.find({ doctor: id });
+        
+        if (appointments.length > 0) {
+            const appointmentIds = appointments.map(appt => appt._id);
+
+            // A. Remove these Appointment IDs from Patients' 'myappointments' array
+            await Patient.updateMany(
+                { myappointments: { $in: appointmentIds } },
+                { $pull: { myappointments: { $in: appointmentIds } } }
+            );
+
+            // B. Delete the Appointments themselves
+            await Appointment.deleteMany({ doctor: id });
+        }
+
+        // 4. DELETE MEDICAL RECORDS
+        const medicalRecords = await MedicalRecord.find({ doctor: id });
+        
+        if (medicalRecords.length > 0) {
+            // A. Delete Report Files from Cloudinary
+            const recordPromises = medicalRecords.map(async (record) => {
+                if (record.reportUrl) {
+                    await deleteFromCloudinary(record.reportUrl);
+                }
+            });
+            await Promise.all(recordPromises);
+
+            // B. Delete Record Documents
+            await MedicalRecord.deleteMany({ doctor: id });
+        }
+
+        // 5. DELETE DOCTOR PROFILE IMAGE
+        if (doctor.image) {
+            await deleteFromCloudinary(doctor.image);
+        }
+
+        // 6. DELETE DOCTOR DOCUMENT
         await Doctor.findByIdAndDelete(id);
-        return res.status(200).json({ success: true, message: "Doctor deleted successfully" });
+
+        return res.status(200).json({ 
+            success: true, 
+            message: "Doctor and all associated data deleted successfully" 
+        });
+
     } catch (error) {
-        console.error(error);
+        console.error("Delete Doctor Error:", error);
         return res.status(500).json({ success: false, message: "Failed to delete doctor" });
     }
 };
@@ -788,23 +846,104 @@ exports.updatePatient = async (req, res) => {
   }
 };
 
-// ==========================================
-// DELETE PATIENT
-// ==========================================
-exports.deletePatient = async (req, res) => {
-  try {
-    const { _id } = req.body; 
-    await Patient.findByIdAndDelete(_id);
-    return res.status(200).json({
-      success: true,
-      message: "Patient deleted successfully",
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: "Failed to delete patient" });
-  }
+// --- Helper: Delete Image/File from Cloudinary ---
+const deleteFromCloudinary = async (url) => {
+    if (!url || !url.includes("cloudinary")) return;
+    try {
+        // Extract Public ID: matches content after 'upload/v<version>/' and before extension
+        // Example: .../upload/v12345/folder/image.jpg => folder/image
+        const publicIdMatch = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-z0-9]+$/i);
+        
+        if (publicIdMatch && publicIdMatch[1]) {
+            const publicId = publicIdMatch[1];
+            await cloudinary.uploader.destroy(publicId);
+            // If it's a PDF or raw file (for reports), you might need:
+            // await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
+        }
+    } catch (error) {
+        console.error("Cloudinary Delete Error:", error.message);
+    }
 };
 
+// ==========================================
+// DELETE PATIENT (Full Cleanup)
+// ==========================================
+exports.deletePatient = async (req, res) => {
+    try {
+        const { _id } = req.body;
+
+        // 1. Find Patient
+        const patient = await Patient.findById(_id);
+        if (!patient) {
+            return res.status(404).json({ success: false, message: "Patient not found" });
+        }
+
+        // 2. FREE BED (If admitted)
+        if (patient.bed) {
+            await Bed.findByIdAndUpdate(patient.bed, {
+                status: "Available",
+                patient: null
+            });
+        }
+
+        // 3. CLEANUP APPOINTMENTS
+        const appointments = await Appointment.find({ patient: _id });
+        
+        if (appointments.length > 0) {
+            const appointmentPromises = appointments.map(async (appt) => {
+                // A. Delete associated TimeSlot
+                if (appt.timeSlotId) {
+                    await Slot.findByIdAndDelete(appt.timeSlotId);
+                }
+                
+                // B. Remove Appointment ID from Doctor's list
+                if (appt.doctor) {
+                    await Doctor.findByIdAndUpdate(appt.doctor, {
+                        $pull: { myappointments: appt._id }
+                    });
+                }
+            });
+            await Promise.all(appointmentPromises);
+            
+            // C. Delete all Appointment Documents
+            await Appointment.deleteMany({ patient: _id });
+        }
+
+        // 4. CLEANUP MEDICAL RECORDS & REPORTS
+        // Assuming 'MedicalRecord' model stores report file URLs in 'reportUrl' or 'file'
+        const medicalRecords = await MedicalRecord.find({ patient: _id });
+        
+        if (medicalRecords.length > 0) {
+            const recordPromises = medicalRecords.map(async (record) => {
+                // Delete Report File from Cloudinary
+                if (record.reportUrl) {
+                    await deleteFromCloudinary(record.reportUrl);
+                }
+            });
+            await Promise.all(recordPromises);
+
+            // Delete Record Documents
+            await MedicalRecord.deleteMany({ patient: _id });
+        }
+
+        // 5. DELETE PATIENT PROFILE IMAGE (Cloudinary)
+        if (patient.image) {
+            await deleteFromCloudinary(patient.image);
+        }
+
+        // 6. DELETE PATIENT DOCUMENT
+        await Patient.findByIdAndDelete(_id);
+
+        return res.status(200).json({
+            success: true,
+            message: "Patient and all associated records deleted successfully",
+        });
+
+    } catch (error) {
+        console.error("Delete Patient Error:", error);
+        return res.status(500).json({ success: false, message: "Failed to delete patient" });
+    }
+};
 
 // ==========================================
 // 1. ADD BED

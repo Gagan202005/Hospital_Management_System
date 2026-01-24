@@ -1,51 +1,160 @@
-import { SidebarProvider, SidebarTrigger } from "../Components/ui/sidebar";
-import PatientSidebar  from "../Components/Core/Patient/PatientSidebar";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import  PatientAppointmentsSection  from "../Components/Core/Patient/PatientAppointmentSection";
-import  PatientProfileSection  from "../Components/Core/Patient/PatientProfileSection";
-import PatientOverview from "../Components/Core/Patient/PatientOverview";
-import { useDispatch, useSelector } from "react-redux"
-import { useNavigate } from "react-router-dom"
-import { logout } from "../services/operations/authApi"
+import React, { useState, useEffect } from "react";
+import { Outlet, NavLink, useLocation, Navigate } from "react-router-dom";
+import Navbar from "../Components/Common/Navbar.jsx"; 
+import HospitalFooter from "../Components/Common/Footer.jsx";
+import { Button } from "../Components/ui/button.jsx";
+import { 
+  Activity, CalendarClock, UserCog, Menu, X, Stethoscope 
+} from "lucide-react";
+import { useSelector } from "react-redux";
 
-
+/**
+ * PatientDashboard Layout
+ * -----------------------
+ * Acts as the wrapper for all patient-related sub-pages.
+ * Manages the Sidebar (Desktop) and Drawer (Mobile).
+ * Enforces Role-Based Access Control (RBAC).
+ */
 const PatientDashboard = () => {
+  // --- Hooks & State ---
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  
-  const { user } = useSelector((state) => state.profile)
-  const accountType = user.accountType;
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
-  const handleLogout = (e) => {
-    e.preventDefault();
-    dispatch(logout(navigate));
+  const { user } = useSelector((state) => state.profile);
+
+  // --- Effect: Scroll Lock ---
+  // Prevents background scrolling when mobile menu is active
+  useEffect(() => {
+    if (isMobileMenuOpen) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = 'unset';
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [isMobileMenuOpen]);
+
+  // --- RBAC Protection ---
+  // Immediately redirect if the user is not a Patient
+  if (user?.accountType !== "Patient") {
+    return <Navigate to="/login" replace />;
+  }
+
+  // --- Navigation Configuration ---
+  // Centralized config for easy updates. Using professional labels.
+  const navItems = [
+    { path: "overview", label: "Medical Summary", icon: Activity },
+    { path: "appointments", label: "Consultations", icon: CalendarClock },
+    { path: "profile", label: "Demographics", icon: UserCog },
+  ];
+
+  // Helper: Get label for current route (for Mobile Header)
+  const getCurrentLabel = () => {
+    const currentItem = navItems.find(item => location.pathname.includes(item.path));
+    return currentItem ? currentItem.label : "Dashboard";
   };
-  console.log(accountType);
+
+  // Helper: Get icon for current route
+  const getCurrentIcon = () => {
+    const currentItem = navItems.find(item => location.pathname.includes(item.path));
+    return currentItem ? currentItem.icon : Activity;
+  };
+
   return (
-    <>
-    {
-        accountType === "Patient" 
-        ? <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
-        <PatientSidebar  
-          onLogout={handleLogout}
-        />
-        <main className="flex-1 p-6 lg:p-8">
-          <div className="lg:hidden mb-4">
-            <SidebarTrigger />
+    <div className="flex flex-col min-h-screen bg-slate-50/50">
+      
+      {/* 1. Global Navbar (Fixed at Top) */}
+      <div className="fixed top-0 w-full z-50">
+        <Navbar />
+      </div>
+
+      {/* 2. Main Layout Container */}
+      {/* pt-14 pushes content down to account for the fixed Navbar height */}
+      <div className="flex flex-1 pt-14 relative mt-[130px]">
+        
+        {/* --- DESKTOP SIDEBAR (Sticky) --- */}
+        {/* Hidden on mobile, block on md screens. Sticky ensures it stays visible while scrolling. */}
+        <aside className="hidden md:block w-64 bg-white border-r border-slate-200 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto shrink-0 z-30 shadow-sm custom-scrollbar">
+          <div className="p-6 border-b border-slate-100">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Stethoscope className="w-5 h-5 text-emerald-600" />
+              Patient Portal
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">Medical Records System</p>
           </div>
-          <Routes>
-            <Route path="/" element={<Navigate to="/patient-dashboard/overview" replace />} />
-            <Route path="/overview" element={<PatientOverview />} />
-            <Route path="/appointments" element={<PatientAppointmentsSection />} />
-            <Route path="/profile" element={<PatientProfileSection />} />
-          </Routes>
+          <nav className="p-4 space-y-1">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === "overview"}
+                className={({ isActive }) => `
+                  flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200
+                  ${isActive 
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm" 
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}
+                `}
+              >
+                <item.icon className={`w-5 h-5 mr-3 ${location.pathname.includes(item.path) ? "text-emerald-600" : "text-slate-400"}`} />
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+
+        {/* --- MAIN CONTENT AREA --- */}
+        <main className="flex-1 flex flex-col w-full min-w-0">
+          
+          {/* Mobile Header (Visible < md) */}
+          <div className="md:hidden sticky top-14 z-20 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2">
+                {React.createElement(getCurrentIcon(), { className: "w-5 h-5 text-emerald-600" })}
+                <span className="font-bold text-slate-800">{getCurrentLabel()}</span>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
+              <Menu className="w-6 h-6 text-slate-700" />
+            </Button>
+          </div>
+
+          {/* Dynamic Sub-Page Content */}
+          <div className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+            {/* The Outlet renders PatientOverview, PatientAppointmentsSection, etc. */}
+            <div className="animate-in fade-in zoom-in-95 duration-300">
+                <Outlet />
+            </div>
+          </div>
         </main>
       </div>
-    </SidebarProvider>
-    : <Navigate to={"/login"}/>
-    }
-    </>
+
+      {/* 3. Global Footer (Spans Full Width) */}
+      <div className="z-40 relative border-t border-slate-200">
+        <HospitalFooter />
+      </div>
+
+      {/* --- MOBILE DRAWER OVERLAY --- */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-[100] flex md:hidden">
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
+          
+          {/* Drawer */}
+          <div className="relative w-72 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-left duration-300">
+            <div className="p-5 border-b bg-emerald-50 flex justify-between items-center">
+              <h2 className="font-bold text-lg text-emerald-900 flex gap-2"><Activity className="w-5 h-5"/> Navigation</h2>
+              <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}><X className="w-6 h-6 text-emerald-700" /></Button>
+            </div>
+            <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={({ isActive }) => `flex items-center w-full px-4 py-3 text-base font-medium rounded-xl transition-all ${isActive ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100"}`}
+                >
+                  <item.icon className="w-5 h-5 mr-3" />
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

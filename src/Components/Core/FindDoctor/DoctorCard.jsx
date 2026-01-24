@@ -1,82 +1,51 @@
 import { Card, CardContent, CardFooter } from "../../ui/card";
 import { Button } from "../../ui/button";
 import { Badge } from "../../ui/badge";
-import { Star, MapPin, Calendar, Award } from "lucide-react";
+import { Star, Calendar, Award, IndianRupee } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export const DoctorCard = ({ doctor }) => {
   const navigate = useNavigate();
 
   return (
-    <Card className="group hover:shadow-elevated transition-all duration-300 hover:scale-105 bg-card border-0 shadow-card">
-      <CardContent className="p-6">
-        <div className="flex flex-col items-center text-center">
-          <div className="relative mb-4">
+    <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white border-slate-200 overflow-hidden">
+      <div className="relative h-24 bg-gradient-to-r from-blue-50 to-indigo-50"></div>
+      <CardContent className="p-6 pt-0 text-center relative">
+        <div className="relative -mt-12 mb-3 inline-block">
             <img
               src={doctor.image}
               alt={doctor.name}
-              className="w-24 h-24 rounded-full object-cover border-4 border-primary/20"
+              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md bg-white"
             />
-            <div className="absolute -top-2 -right-2 bg-secondary rounded-full p-1">
-              <Award className="w-4 h-4 text-white" />
+            <div className="absolute bottom-0 right-0 bg-yellow-400 rounded-full p-1 border-2 border-white text-white">
+              <Star className="w-3 h-3 fill-current" />
             </div>
-          </div>
-          
-          <h3 className="text-xl font-semibold text-foreground mb-1">
-            Dr. {doctor.name}
-          </h3>
-          
-          <Badge variant="secondary" className="mb-3 bg-gradient-to-r from-primary/10 to-secondary/10 text-primary border-0">
-            {doctor.specialty}
-          </Badge>
-          
-          <div className="flex items-center gap-1 mb-3">
-            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-            <span className="text-sm font-medium">{doctor.rating}</span>
-            <span className="text-sm text-muted-foreground">
-              ({doctor.experience} exp.)
+        </div>
+        
+        <h3 className="text-lg font-bold text-slate-900 mb-1">{doctor.name}</h3>
+        <p className="text-sm text-blue-600 font-medium mb-3">{doctor.specialty}</p>
+        
+        <div className="flex items-center justify-center gap-2 mb-4 text-xs text-slate-500">
+            <Badge variant="secondary" className="font-normal bg-slate-100 text-slate-600 hover:bg-slate-100">
+                {doctor.experience} Exp
+            </Badge>
+            <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+            <span>{doctor.education}</span>
+        </div>
+        
+        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg text-sm mb-2">
+            <span className="text-slate-500">Consultation</span>
+            <span className="font-bold text-slate-900 flex items-center">
+                <IndianRupee className="w-3 h-3" /> {doctor.consultationFee}
             </span>
-          </div>
-          
-          <div className="space-y-2 w-full">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Award className="w-4 h-4" />
-              <span>{doctor.education}</span>
-            </div>
-            
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="w-4 h-4" />
-              <span>{doctor.location}</span>
-            </div>
-            
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="w-4 h-4" />
-              <span>{doctor.availability}</span>
-            </div>
-          </div>
-          
-          <div className="mt-4 p-3 bg-muted rounded-lg w-full">
-            <div className="text-sm text-muted-foreground">Consultation Fee</div>
-            <div className="text-lg font-semibold text-primary">
-              ${doctor.consultationFee}
-            </div>
-          </div>
         </div>
       </CardContent>
       
-      <CardFooter className="p-6 pt-0 flex gap-2">
-        <Button 
-          variant="outline" 
-          className="flex-1"
-          onClick={() => navigate(`/doctor/${doctor.id}`)}
-        >
-          View Profile
+      <CardFooter className="p-4 pt-0 gap-2">
+        <Button variant="outline" className="flex-1 border-slate-200" onClick={() => navigate(`/doctor/${doctor.id}`)}>
+          Profile
         </Button>
-        <Button 
-          variant="appointment" 
-          className="flex-1"
-          onClick={() => navigate(`/doctor/${doctor.id}/book`)}
-        >
+        <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={() => navigate(`/doctor/${doctor.id}/book`)}>
           Book Now
         </Button>
       </CardFooter>

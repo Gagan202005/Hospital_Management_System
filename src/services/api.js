@@ -9,6 +9,8 @@ export const endpoints = {
   LOGIN_API: BASE_URL + "/auth/login",
   RESETPASSTOKEN_API: BASE_URL + "/auth/reset-password-token",
   RESETPASSWORD_API: BASE_URL + "/auth/reset-password",
+  CHANGE_PASSWORD_API : BASE_URL + "/auth/change-password",
+  CONTACT_US_API: BASE_URL + "/auth/contact",
 };
 
 export const profendpoints = {
@@ -54,13 +56,13 @@ export const Doctorendpoints = {
   UPDATE_DOCTOR_IMAGE_API : BASE_URL + "/Doctor/updateDisplayPicture",
   UPDATE_DOCTOR_PROFILE_API : BASE_URL + "/Doctor/editprofile",
   GET_PUBLIC_DOCTORS_API : BASE_URL + "/Doctor/public/search",
-  GET_DOCTOR_DETAILS_API : BASE_URL + "/doctor/public/profile",
-  GET_DOCTOR_PATIENTS_API : BASE_URL + "/doctor/patients", 
-  GET_DOCTOR_APPOINTMENTS_API: BASE_URL + "/doctor/appointments",
-  UPDATE_APPOINTMENT_STATUS_API: BASE_URL + "/doctor/update-status",
-  GET_DOCTOR_SLOTS_API : BASE_URL + "/doctor/slots",
-  BOOK_APPOINTMENT_API : BASE_URL + "/doctor/book",
-  GET_DASHBOARD_STATS_API: BASE_URL + "/doctor/dashboard-stats",
+  GET_DOCTOR_DETAILS_API : BASE_URL + "/Doctor/public/profile",
+  GET_DOCTOR_PATIENTS_API : BASE_URL + "/Doctor/patients", 
+  GET_DOCTOR_APPOINTMENTS_API: BASE_URL + "/Doctor/appointments",
+  UPDATE_APPOINTMENT_STATUS_API: BASE_URL + "/Doctor/update-status",
+  GET_DOCTOR_SLOTS_API : BASE_URL + "/Doctor/slots",
+  BOOK_APPOINTMENT_API : BASE_URL + "/Doctor/book",
+  GET_DASHBOARD_STATS_API: BASE_URL + "/Doctor/dashboard-stats",
 }
 
 export const MedicalRecordEndpoints = {

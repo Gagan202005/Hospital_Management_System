@@ -5,7 +5,6 @@ const OTP = require("../models/OTP")
 const otpGenerator = require("otp-generator");
 const Doctor = require("../models/Doctor");
 const Appointment = require("../models/Appointment");
-const {instance} = require("../config/razorpay");
 const crypto = require("crypto");
 const MedicalRecord = require("../models/Medicalrecord")
 require("dotenv").config();
@@ -153,123 +152,6 @@ exports.sendotp = async (req, res) => {
 };
 
 
-
-exports.capturePayment = async (req, res) => {
-    const {doctor,amount} = req.body;
-    //validation
-    try{
-        if(doctor) {
-            return res.json({
-                success:false,
-                message:'Please provide valid doctor',
-            })
-        };
-        const options = {
-            totalamount: amount * 100,
-            currency: "INR",
-            receipt: Math.random(Date.now()).toString(),
-        };
-
-        try{
-            //initiate the payment using razorpay
-            const paymentResponse = await instance.orders.create(options);
-            console.log("payment",paymentResponse);
-            //return response
-            return res.status(200).json({
-                success:true,
-                orderId: paymentResponse.id,
-                currency:paymentResponse.currency,
-                amount:paymentResponse.amount,
-            });
-        }
-        catch(error) {
-            console.error(error);
-            return res.status(500).json({
-                success:false,
-                message:error.message,
-            });
-        }
-    }
-    catch(error) {
-        console.error(error);
-        return res.status(500).json({
-            success:false,
-            message:error.message,
-        });
-    }
-    
-};
-
-
-
-//verify the signature
-exports.verifySignature = async (req, res) => {
-    //get the payment details
-    const {razorpay_payment_id, razorpay_order_id, razorpay_signature} = req.body;
-    const {user_id} = req.user.id;
-    const {doc_id,disease,time,date} = req.body;
-    if(disease && time && date && !doc_id && !user_id){
-        return res.status(401).json({
-            success:false,
-            message:'all fields are required',
-        });
-    }
-    if(!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
-        return res.status(400).json({
-            success:false,
-            message:'Payment details are incomplete',
-        });
-    }
-
-    let body = razorpay_order_id + "|" + razorpay_payment_id;
-
-    const make_appointment = async (user_id,doc_id,disease,date,time) => {
-                try{
-                    const appointment = await Appointment.create({
-                        patient : user_id,
-                        doctor : doc_id,
-                        time,
-                        date,
-                        disease,
-                    });
-                    const user = await Patient.findById({user_id});
-                    user.myappointments.push({appointment});
-                    const doctor = await Doctor.findById({doc_id});
-                    doctor.myappointments.push({appointment});
-                    return res.status(200).json({
-                        success:true,
-                        message:'Payment successful',
-                    });
-                }
-                catch(error) {
-                    console.error(error);
-                    return res.status(500).json({
-                        success:false,
-                        message:error.message,
-                    });
-                }
-            
-        }
-
-    try{
-        //verify the signature
-        const generatedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_SECRET).update(body.toString()).digest("hex");
-        if(generatedSignature === razorpay_signature) {
-            await make_appointment(user_id, doc_id,disease,date,time);
-        }
-
-    }
-    catch(error) {
-        console.error(error);
-        return res.status(500).json({
-            success:false,
-            message:error.message,
-        });
-    }
-
-}
-
-
 exports.getallreports = async (req,res) => {
     try{
         const {patientID} = req.user._id;
@@ -295,40 +177,68 @@ exports.getallreports = async (req,res) => {
     }
 }
 
+// =============================================
+// EDIT PROFILE (TEXT DATA)
+// =============================================
 exports.editprofile = async (req, res) => {
-	try {
-		const { firstName,lastName,DOB,gender,phoneno,address,bloodgroup,emergencyContactName,emergencyContactPhone} = req.body;
-		const id = req.user.id;
-		
-		// Find the profile by id
-		const profile = await Patient.findById(id);
+    try {
+        // 1. Destructure data
+        const { 
+            firstName, 
+            lastName, 
+            email, 
+            DOB, 
+            gender, 
+            phoneno, 
+            address, 
+            bloodgroup, 
+            emergencyContactName, 
+            emergencyContactPhone 
+        } = req.body;
 
-		// Update the profile fields
-		profile.firstName = firstName;
-		profile.lastName = lastName;
-		profile.DOB = DOB;
-		profile.gender=gender;
-		profile.phoneno = phoneno;
-		profile.address = address ;
-		profile.bloodgroup = bloodgroup ;
-		profile.emergencyContactName = emergencyContactName;
-		profile.emergencyContactPhone=emergencyContactPhone;
+        const id = req.user.id; // From auth middleware
 
-		// Save the updated profile
-		await profile.save();
+        // 2. Find Patient
+        const patient = await Patient.findById(id);
+        if (!patient) {
+            return res.status(404).json({
+                success: false,
+                message: "Patient not found",
+            });
+        }
 
-		return res.json({
-			success: true,
-			message: "Profile updated successfully",
-			profile,
-		});
-	} catch (error) {
-		console.log(error);
-		return res.status(500).json({
-			success: false,
-			error: error.message,
-		});
-	}
+        // 3. Update Fields
+        // We update conditionally to avoid overwriting with undefined if something is missing
+        if (firstName) patient.firstName = firstName;
+        if (lastName) patient.lastName = lastName;
+        if (email) patient.email = email;
+        if (phoneno) patient.phoneno = phoneno;
+        
+        // These fields might be sent as null/empty strings intentionally to clear them
+        patient.DOB = DOB; 
+        patient.gender = gender;
+        patient.address = address;
+        patient.bloodgroup = bloodgroup;
+        patient.emergencyContactName = emergencyContactName;
+        patient.emergencyContactPhone = emergencyContactPhone;
+
+        // 4. Save
+        await patient.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Profile updated successfully",
+            profile: patient,
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal Server Error",
+            error: error.message,
+        });
+    }
 };
 
 

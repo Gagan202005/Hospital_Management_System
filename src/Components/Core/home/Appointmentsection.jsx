@@ -1,93 +1,88 @@
-import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card"; // Adjusted path
-import { Button } from "../../ui/button";     // Adjusted path
-import { CalendarPlus, Phone, Globe, MapPin } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
+import { Button } from "../../ui/button";
+import { CalendarPlus, Phone, Globe, MapPin, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const AppointmentSection = () => {
   return (
-    <section id="appointments" className="py-20 bg-gradient-to-r from-primary to-primary-soft">
-      <div className="container mx-auto px-4">
-        <div className="text-center text-primary-foreground mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Schedule Your Appointment Today
+    <section id="appointments" className="py-20 bg-gradient-to-r from-primary to-primary-soft text-primary-foreground relative overflow-hidden">
+      
+      {/* Decorative Elements */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+      
+      <div className="container mx-auto px-4 relative z-10">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl md:text-3xl font-bold mb-3">
+            Begin Your Path to Better Health
           </h2>
-          <p className="text-xl text-primary-foreground/90 max-w-2xl mx-auto">
-            Multiple convenient ways to book your appointment with our healthcare professionals
+          <p className="text-lg opacity-90 max-w-2xl mx-auto font-light">
+            Choose the most convenient way to connect with us.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Constrained Width for Smaller Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          
           {/* Online Booking */}
-          <Card className="text-center shadow-medical border-0 hover:shadow-xl transition-shadow duration-300">
-            <CardHeader>
-              <div className="mx-auto mb-4 p-4 rounded-full bg-primary-light">
-                <Globe className="h-8 w-8 text-primary" />
+          <Card className="text-center shadow-xl border-0 hover:-translate-y-1 transition-transform duration-300 bg-card">
+            <CardHeader className="p-6 pb-2">
+              <div className="mx-auto mb-3 p-3 rounded-full bg-primary-light w-fit">
+                <Globe className="h-6 w-6 text-primary" />
               </div>
-              <CardTitle className="text-xl">Online Booking</CardTitle>
+              <CardTitle className="text-lg text-foreground font-bold">Book Online</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-6">
-                Book appointments 24/7 through our secure online portal. View available slots and choose your preferred time.
+            <CardContent className="p-6 pt-0">
+              <p className="text-sm text-muted-foreground mb-6">
+                View real-time availability and secure your slot instantly.
               </p>
-              <Button variant="medical" className="w-full">
-                <CalendarPlus className="h-4 w-4" />
-                Book Online
+              <Button variant="medical" className="w-full h-10 text-sm shadow-sm" asChild>
+                <Link to="/find-doctor">
+                  Schedule Now <ArrowRight className="ml-2 h-4 w-4"/>
+                </Link>
               </Button>
             </CardContent>
           </Card>
 
           {/* Phone Booking */}
-          <Card className="text-center shadow-medical border-0 hover:shadow-xl transition-shadow duration-300">
-            <CardHeader>
-              <div className="mx-auto mb-4 p-4 rounded-full bg-secondary-light">
-                <Phone className="h-8 w-8 text-secondary" />
+          <Card className="text-center shadow-xl border-0 hover:-translate-y-1 transition-transform duration-300 bg-white/95 backdrop-blur">
+            <CardHeader className="p-6 pb-2">
+              <div className="mx-auto mb-3 p-3 rounded-full bg-secondary-light w-fit">
+                <Phone className="h-6 w-6 text-secondary" />
               </div>
-              <CardTitle className="text-xl">Call Us</CardTitle>
+              <CardTitle className="text-lg text-foreground font-bold">Call Center</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-6">
-                Speak directly with our appointment coordinators. Available Monday through Friday, 8 AM to 6 PM.
+            <CardContent className="p-6 pt-0">
+              <p className="text-sm text-muted-foreground mb-6">
+                Speak with coordinators. <br/> Mon-Fri, 8 AM - 8 PM.
               </p>
-              <Button variant="care" className="w-full">
-                <Phone className="h-4 w-4" />
-                (555) 123-4567
+              <Button variant="outline" className="w-full h-10 text-sm border-secondary text-secondary hover:bg-secondary-light" asChild>
+                <a href="tel:+15551234567">
+                  (555) 123-4567
+                </a>
               </Button>
             </CardContent>
           </Card>
 
-          {/* Walk-in */}
-          <Card className="text-center shadow-medical border-0 hover:shadow-xl transition-shadow duration-300">
-            <CardHeader>
-              <div className="mx-auto mb-4 p-4 rounded-full bg-accent-light">
-                <MapPin className="h-8 w-8 text-accent" />
+          {/* Emergency */}
+          <Card className="text-center shadow-xl border-0 hover:-translate-y-1 transition-transform duration-300 bg-white/95 backdrop-blur border-t-4 border-t-destructive">
+            <CardHeader className="p-6 pb-2">
+              <div className="mx-auto mb-3 p-3 rounded-full bg-destructive/10 w-fit">
+                <MapPin className="h-6 w-6 text-destructive" />
               </div>
-              <CardTitle className="text-xl">Walk-in Clinic</CardTitle>
+              <CardTitle className="text-lg text-foreground font-bold">Emergency</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-6">
-                No appointment needed for urgent care. Open daily from 7 AM to 9 PM for non-emergency medical needs.
+            <CardContent className="p-6 pt-0">
+              <p className="text-sm text-muted-foreground mb-6">
+                For life-threatening situations, call us immediately.
               </p>
-              <Button variant="outline" className="w-full">
-                <MapPin className="h-4 w-4" />
-                Get Directions
+              <Button variant="destructive" className="w-full h-10 text-sm shadow-sm" asChild>
+                <a href="tel:911">
+                  Call 911
+                </a>
               </Button>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Emergency Notice */}
-        <div className="mt-12 text-center">
-          <Card className="bg-destructive/10 border-destructive/20 max-w-2xl mx-auto">
-            <CardContent className="py-6">
-              <h3 className="text-xl font-bold text-destructive mb-2">Medical Emergency?</h3>
-              <p className="text-foreground mb-4">
-                For life-threatening emergencies, call 911 or visit our Emergency Department immediately.
-              </p>
-              <Button variant="emergency" size="lg">
-                <Phone className="h-5 w-5" />
-                Call 911
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </section>

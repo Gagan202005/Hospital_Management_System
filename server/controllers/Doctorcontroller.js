@@ -2,105 +2,79 @@ const Doctor = require("../models/Doctor");
 const Appointment = require("../models/Appointment");
 const TimeSlot = require("../models/Slot"); // Ensure filename matches your model (e.g., TimeSlot.js)
 const Patient = require("../models/Patient"); // Kept if you plan to use it later
-
-// =================================================================
-// 1. DOCTOR PROFILE MANAGEMENT
-// =================================================================
-
+const mailSender = require("../utils/mailSender"); // Ensure you have this utility
+// =============================================
+// UPDATE DOCTOR PROFILE
+// =============================================
 exports.updateDoctorProfile = async (req, res) => {
-  try {
-    // 1. Get Doctor ID from authenticated request
-    const doctorId = req.user.id;
-
-    // 2. Get data from body
-    const {
-      firstName,
-      lastName,
-      phoneno,
-      dob,
-      age,
-      gender,
-      bloodGroup,
-      address,
-      department,
-      specialization,
-      experience,
-      consultationFee,
-      about,
-      qualification // Expected to be an array of objects
-    } = req.body;
-
-    // 3. Find the Doctor
-    const doctor = await Doctor.findById(doctorId);
-
-    if (!doctor) {
-      return res.status(404).json({
-        success: false,
-        message: "Doctor not found",
-      });
-    }
-
-    // 4. Update Fields (only if provided)
-    if (firstName) doctor.firstName = firstName;
-    if (lastName) doctor.lastName = lastName;
-    if (phoneno) doctor.phoneno = phoneno;
-    if (dob) doctor.dob = dob;
-    if (age) doctor.age = age;
-    if (gender) doctor.gender = gender;
-    if (bloodGroup) doctor.bloodGroup = bloodGroup;
-    if (address) doctor.address = address;
-    
-    if (department) doctor.department = department;
-    if (specialization) doctor.specialization = specialization;
-    if (experience) doctor.experience = experience;
-    if (consultationFee !== undefined) doctor.consultationFee = consultationFee;
-    if (about) doctor.about = about;
-
-    // Update Qualifications: Replace entire array if provided
-    if (qualification && Array.isArray(qualification)) {
-      doctor.qualification = qualification;
-    }
-
-    // 5. Save updates
-    await doctor.save();
-
-    // 6. Return Response (exclude sensitive data)
-    doctor.password = undefined;
-    doctor.token = undefined;
-
-    return res.status(200).json({
-      success: true,
-      message: "Profile updated successfully",
-      data: doctor,
-    });
-
-  } catch (error) {
-    console.error("UPDATE_PROFILE_ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update profile",
-      error: error.message,
-    });
-  }
-};
-
-exports.makingreport = async (req, res) => {
     try {
-        // Logic for making report goes here
-        // Example placeholder:
-        // const { email, name, disease, suggestions, test_report, medicines } = req.body;
-        // ... logic ...
+        const userId = req.user.id;
+        
+        // 1. Destructure all possible fields from frontend
+        const {
+            firstName,
+            lastName,
+            phoneno,       // <--- Added Field
+            address,       // <--- Added Field
+            dob,
+            age,
+            gender,
+            bloodGroup,
+            department,
+            specialization,
+            qualification, // Array
+            experience,
+            consultationFee,
+            about
+        } = req.body;
+
+        // 2. Find Doctor
+        const doctor = await Doctor.findById(userId);
+        if (!doctor) {
+            return res.status(404).json({ success: false, message: "Doctor not found" });
+        }
+
+        // 3. Update Fields (Only if provided)
+        if (firstName) doctor.firstName = firstName;
+        if (lastName) doctor.lastName = lastName;
+        
+        // --- Contact Details ---
+        if (phoneno) doctor.phoneno = phoneno;
+        if (address) doctor.address = address;
+
+        // --- Personal Details ---
+        if (dob) doctor.dob = dob;
+        if (age) doctor.age = age;
+        if (gender) doctor.gender = gender;
+        if (bloodGroup) doctor.bloodGroup = bloodGroup;
+
+        // --- Professional Details ---
+        if (department) doctor.department = department;
+        if (specialization) doctor.specialization = specialization;
+        if (qualification) doctor.qualification = qualification;
+        if (experience) doctor.experience = experience;
+        if (consultationFee) doctor.consultationFee = consultationFee;
+        if (about) doctor.about = about;
+
+        // 4. Save Updates
+        await doctor.save();
+
         return res.status(200).json({
             success: true,
-            message: "Report logic placeholder"
+            message: "Profile updated successfully",
+            data: doctor,
         });
-    } catch (err) {
+
+    } catch (error) {
+        console.error("Update Doctor Profile Error:", error);
         return res.status(500).json({
             success: false,
-            error: err.message,
+            message: "Failed to update profile",
+            error: error.message
         });
     }
 };
+
 
 
 // =================================================================
@@ -174,44 +148,6 @@ exports.getTimeSlots = async (req, res) => {
   }
 };
 
-// --- DELETE TIME SLOT ---
-exports.deleteTimeSlot = async (req, res) => {
-  try {
-    const { slotId } = req.body; 
-
-    if (!slotId) {
-      return res.status(400).json({
-        success: false,
-        message: "Slot ID is required",
-      });
-    }
-
-    const deletedSlot = await TimeSlot.findOneAndDelete({
-      _id: slotId,
-      doctorId: req.user.id, // Ensure ownership
-    });
-
-    if (!deletedSlot) {
-      return res.status(404).json({
-        success: false,
-        message: "Slot not found or unauthorized",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Time slot deleted successfully",
-    });
-
-  } catch (error) {
-    console.error("DELETE_SLOT_ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to delete time slot",
-      error: error.message,
-    });
-  }
-};
 
 
 // =================================================================
@@ -343,7 +279,6 @@ exports.getAvailableSlots = async (req, res) => {
   }
 };
 
-// --- Book Appointment (Public/Patient) ---
 exports.bookAppointment = async (req, res) => {
   try {
     const { 
@@ -351,49 +286,71 @@ exports.bookAppointment = async (req, res) => {
       firstName, lastName, email, phone, reason, symptoms 
     } = req.body;
 
-    // 1. Check for Logged-In User
-    // If auth middleware ran and token is valid, req.user will exist.
-    // If not (guest), patientId will be null.
-    const patientId = req.user ? req.user.id : null;
+    // 1. Strict Auth Check
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, message: "Please login to book an appointment." });
+    }
+    const patientId = req.user.id;
 
-    // 2. Verify the Slot exists and is free
+    // 2. Verify Slot
     const slotDoc = await TimeSlot.findById(timeSlotId);
-
     if (!slotDoc) {
       return res.status(404).json({ success: false, message: "Time slot not found" });
     }
-
     if (slotDoc.isBooked) {
       return res.status(400).json({ success: false, message: "This slot is already booked" });
     }
 
-    // 3. Create the Appointment
+    // 3. Create Appointment (Status: Pending)
     const newAppointment = await Appointment.create({
       doctor: doctorId,
-      patient: patientId, // <--- LINK PATIENT ID HERE
+      patient: patientId,
       patientDetails: { firstName, lastName, email, phone },
       date: slotDoc.date,
       timeSlotId: slotDoc._id,
       timeSlot: slotDoc.startTime,
       reason,
       symptoms,
-      status: "Scheduled"
+      status: "Pending" // Changed from Scheduled to Pending
     });
 
-    // 4. Mark the TimeSlot as Booked
+    // 4. Mark Slot as Booked
     slotDoc.isBooked = true;
     slotDoc.appointmentId = newAppointment._id;
     await slotDoc.save();
 
+    // 5. Send Email Notification
+    try {
+      const emailBody = `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2 style="color: #4F46E5;">Appointment Request Received</h2>
+          <p>Dear ${firstName},</p>
+          <p>Your appointment request has been received and is currently in a <strong>Pending</strong> state.</p>
+          <p><strong>Details:</strong><br/>
+             Date: ${new Date(date).toDateString()}<br/>
+             Time: ${slotDoc.startTime}
+          </p>
+          <p>We will notify you via email once the doctor confirms your visit or if there are any changes.</p>
+          <hr/>
+          <p style="font-size: 12px; color: #666;">Note: No payment is required online. Consultation fees are collected at the hospital.</p>
+        </div>
+      `;
+      
+      await mailSender(email, "Appointment Request Pending", emailBody);
+    } catch (mailError) {
+      console.error("Email sending failed:", mailError);
+      // Continue execution, don't fail the booking
+    }
+
     return res.status(200).json({
       success: true,
-      message: "Appointment booked successfully",
+      message: "Appointment request sent successfully",
       data: newAppointment
     });
 
   } catch (error) {
     console.error("BOOK_APPOINTMENT_ERROR:", error);
-    return res.status(500).json({ success: false, message: "Booking failed" });
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 
@@ -482,40 +439,53 @@ exports.getDoctorAppointments = async (req, res) => {
   }
 };
 
-// =================================================================
-// 2. UPDATE APPOINTMENT STATUS (Cancel, Confirm, etc.)
-// =================================================================
+// ==========================================
+// UPDATE APPOINTMENT STATUS
+// ==========================================
 exports.updateAppointmentStatus = async (req, res) => {
   try {
     const { appointmentId, status } = req.body; 
 
-    // Validate Status against your Schema Enum
-    const validStatuses = ["Scheduled", "Confirmed", "Cancelled", "Completed", "Pending"];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid status provided" 
-      });
-    }
-
-    // Find and Update
-    const appointment = await Appointment.findByIdAndUpdate(
-      appointmentId,
-      { status: status },
-      { new: true } // Return the updated document
-    );
-
+    // 1. Find Appointment with Patient Details
+    const appointment = await Appointment.findById(appointmentId).populate("patient"); // Ensure patient email is available
     if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: "Appointment not found",
-      });
+      return res.status(404).json({ success: false, message: "Appointment not found" });
     }
 
-    // Logic: If Cancelling, free up the TimeSlot
-    // This makes the slot available for booking again
+    // 2. Update Status
+    appointment.status = status;
+    await appointment.save();
+
+    // 3. Logic: If Cancelled, Free up TimeSlot
     if (status === "Cancelled" && appointment.timeSlotId) {
-       await TimeSlot.findByIdAndUpdate(appointment.timeSlotId, { isBooked: false });
+       await TimeSlot.findByIdAndUpdate(appointment.timeSlotId, { 
+           isBooked: false, 
+           appointmentId: null 
+       });
+       appointment.timeSlotId = null;
+    }
+
+    // 4. Send Email Notification
+    if (appointment.patientDetails?.email) {
+        try {
+            let subject = `Appointment Status Update: ${status}`;
+            let body = "";
+
+            if (status === "Confirmed") {
+                body = `<p>Your appointment has been <strong>CONFIRMED</strong> by the doctor.</p>
+                        <p>Please arrive 15 minutes early at the hospital counter for payment.</p>`;
+            } else if (status === "Cancelled") {
+                body = `<p>Your appointment has been <strong>CANCELLED</strong>.</p>
+                        <p>Reason: Administrative/Doctor Unavailable.</p>
+                        <p>You can book a new slot via the portal.</p>`;
+            } else {
+                body = `<p>Your appointment status has changed to: <strong>${status}</strong>.</p>`;
+            }
+
+            await mailSender(appointment.patientDetails.email, subject, body);
+        } catch (mailError) {
+            console.error("Mail Error:", mailError);
+        }
     }
 
     return res.status(200).json({
@@ -526,14 +496,38 @@ exports.updateAppointmentStatus = async (req, res) => {
 
   } catch (error) {
     console.error("UPDATE_STATUS_ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update appointment status",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: "Failed to update status" });
   }
 };
 
+// ==========================================
+// DELETE TIME SLOT (Protected)
+// ==========================================
+exports.deleteTimeSlot = async (req, res) => {
+    try {
+        const { slotId } = req.body; // Or req.params depending on your route
+
+        const slot = await TimeSlot.findById(slotId);
+        if (!slot) {
+            return res.status(404).json({ success: false, message: "Slot not found" });
+        }
+
+        // PROTECTION: Cannot delete if booked
+        if (slot.isBooked) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Cannot delete a slot that is Booked or Pending." 
+            });
+        }
+
+        await TimeSlot.findByIdAndDelete(slotId);
+
+        return res.status(200).json({ success: true, message: "Time slot deleted successfully" });
+
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
 
 exports.getDoctorDashboardStats = async (req, res) => {
   try {

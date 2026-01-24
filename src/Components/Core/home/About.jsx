@@ -1,66 +1,72 @@
-import { Card, CardContent } from "../../ui/card"; // Changed from @/components/ui/card
-import { Button } from "../../ui/button";         // Changed from @/components/ui/button
-import medicalTeam from "../../../img/new.webp";      // Changed from @/assets/medical-team.jpg
+import { Card, CardContent } from "../../ui/card";
+import { Button } from "../../ui/button";
+import medicalTeam from "../../../img/new.webp";
 import { features } from "../../../Data/features";
+import { Link } from "react-router-dom";
+import { CheckCircle2, ArrowRight } from "lucide-react";
+
 const AboutSection = () => {
   return (
-    <section id="about" className="py-20 bg-background">
+    <section id="about" className="py-24 bg-background">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Content */}
+          
+          {/* Content Side */}
           <div>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
-              Excellence in Healthcare Since 1985
+            <div className="inline-block px-3 py-1 mb-4 text-xs font-semibold tracking-wider text-primary uppercase bg-primary-light rounded-full">
+              Who We Are
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6 leading-tight">
+              A Legacy of Healing, <br/> A Future of Hope
             </h2>
             <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-              MediCare General Hospital has been serving our community for over 35 years,
-              providing compassionate, comprehensive healthcare services. Our commitment to
-              medical excellence and patient-centered care has made us a trusted healthcare
-              partner for thousands of families.
+              MediCare General Hospital has been a pillar of the community for over 35 years. 
+              We believe in treating the person, not just the disease, through a holistic approach 
+              that combines medical expertise with genuine compassion.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-              {features.map((feature, index) => {
-                const Icon = feature.icon;
-                return (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-primary-light shrink-0">
-                      <Icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground mb-1">{feature.title}</h3>
-                      <p className="text-sm text-muted-foreground">{feature.description}</p>
-                    </div>
+              {features.map((feature, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <div className="mt-1 text-primary">
+                    <CheckCircle2 className="h-5 w-5" />
                   </div>
-                );
-              })}
+                  <div>
+                    <h3 className="font-semibold text-foreground text-lg">{feature.title}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{feature.description}</p>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <Button size="lg">
-              Learn More About Us
+            <Button size="lg" variant="default" className="shadow-lg shadow-primary/20" asChild>
+              <Link to="/about">
+                Read Our Story <ArrowRight className="ml-2 h-4 w-4"/>
+              </Link>
             </Button>
           </div>
 
-          {/* Image */}
+          {/* Image Side - Original Styling Preserved */}
           <div className="relative">
             <Card className="overflow-hidden shadow-medical border-0">
               <CardContent className="p-0">
                 <img
                   src={medicalTeam}
                   alt="Our medical team"
-                  className="w-full h-[400px] object-cover"
+                  className="w-full h-[400px] object-cover hover:scale-105 transition-transform duration-500"
                 />
               </CardContent>
             </Card>
 
             {/* Floating Stats Card */}
-            <Card className="absolute -bottom-6 -left-6 bg-card shadow-medical border-0 p-6">
+            <Card className="absolute -bottom-6 -left-6 bg-card shadow-medical border-0 p-6 hidden md:block">
               <div className="text-center">
                 <div className="text-2xl font-bold text-primary mb-1">98%</div>
                 <div className="text-sm text-muted-foreground">Patient Satisfaction</div>
               </div>
             </Card>
           </div>
+
         </div>
       </div>
     </section>
