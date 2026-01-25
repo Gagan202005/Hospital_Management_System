@@ -3,7 +3,6 @@ import { setLoading, setToken } from "../../Slices/authslice"
 import { setUser } from "../../Slices/profileslice"
 import { endpoints } from "../api"
 import {apiConnector} from "../apiConnector"
-import {setProgress} from "../../Slices/loadingbarslice"
 import { useSelector } from "react-redux"
 const {
   SENDOTP_API,
@@ -12,7 +11,8 @@ const {
   RESETPASSTOKEN_API,
   RESETPASSWORD_API,
   CHANGE_PASSWORD_API,
-  CONTACT_US_API
+  GEMINI_CHAT_API,
+  CONTACT_US_API,
 } = endpoints
 
 
@@ -23,7 +23,6 @@ export function SendOtp (email,navigate) {
             const response = await apiConnector("POST",SENDOTP_API,{
                     email,
             })
-            dispatch(setProgress(100));
             if(response.data.success){
                 toast.success("OTP Sent Successfully")
                 navigate("/verify-email");
@@ -35,7 +34,6 @@ export function SendOtp (email,navigate) {
         catch(error){
             console.log("SENDOTP API ERROR............", error)
             toast.error(error.response.data.message);
-            dispatch(setProgress(100));
         }
         dispatch(setLoading(false))
     }
@@ -64,7 +62,6 @@ export function Signup(
             })
             console.log("SIGNUP API RESPONSE............", response)
 
-            dispatch(setProgress(100));
             if(response.data.success){
                 toast.success("Registered Successfully")
                 navigate("/login");
@@ -74,7 +71,6 @@ export function Signup(
             }
         }
         catch(error){
-            dispatch(setProgress(100));
             console.log("SIGNUP API ERROR............", error)
             toast.error("Signup Failed")
             navigate("/signup")
@@ -91,7 +87,6 @@ export function login(email,password,accountType,navigate){
             email,password,accountType
         })
         console.log(response);
-        dispatch(setProgress(100));
         if(!response.data.success){
             throw new Error(response.data.message);
         }
@@ -107,7 +102,6 @@ export function login(email,password,accountType,navigate){
         setLoading(false);
     }
     catch(error){
-        dispatch(setProgress(100));
         toast.error(error.response.data.message);
         setLoading(false);
         navigate("/login");
@@ -177,4 +171,21 @@ export const contactUsApi = async (data, setLoading) => {
   
   setLoading(false);
   toast.dismiss(toastId);
+};
+
+
+export const getAiResponse = async (prompt) => {
+  try {
+    const response = await apiConnector("POST", GEMINI_CHAT_API, { prompt });
+
+    if (!response.data.success) {
+      throw new Error(response.data.message);
+    }
+
+    return response.data.data; // Returns the AI text string
+  } catch (error) {
+    console.log("AI_CHAT_API ERROR:", error);
+    toast.error("Could not reach AI Assistant");
+    return null;
+  }
 };

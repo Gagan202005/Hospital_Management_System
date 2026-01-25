@@ -1,41 +1,66 @@
 const express = require("express");
-
 const app = express();
 
-const PatientRoutes = require("./routes/Patient_routes");
-const AdminRoutes = require("./routes/Admin_routes");
-const AuthRoutes = require("./routes/Auth_routes");
-const DoctorRoutes = require("./routes/Doctor_routes");
-const medicalRecordRoutes = require("./routes/Report_routes");
-
-const database = require("./config/database");
+// =================================================================
+// IMPORTS
+// =================================================================
+// 1. Standard Libraries & Third-Party Modules
+const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
-
 const cors = require("cors");
 const fileUpload = require("express-fileupload");
+
+// 2. Configuration & Utilities
+const database = require("./config/database");
 const { cloudinaryconnect } = require("./config/cloudinary");
 
-const dotenv = require("dotenv");
-dotenv.config(); // Loads .env file contents into process.env
+// 3. Route Handlers
+const AuthRoutes = require("./routes/Auth_routes");
+const PatientRoutes = require("./routes/Patient_routes");
+const DoctorRoutes = require("./routes/Doctor_routes");
+const AdminRoutes = require("./routes/Admin_routes");
+const medicalRecordRoutes = require("./routes/Report_routes");
+
+
+// =================================================================
+// CONFIGURATION
+// =================================================================
+// Load environment variables
+dotenv.config();
 
 const PORT = process.env.PORT || 5000;
+
+// Connect to MongoDB
 database.connect();
 
+// Connect to Cloudinary (for image uploads)
+cloudinaryconnect();
+
+
+// =================================================================
+// MIDDLEWARE
+// =================================================================
+// Parse JSON bodies
 app.use(express.json());
+
+// Parse Cookies
 app.use(cookieParser());
 
+// CORS Configuration (Cross-Origin Resource Sharing)
+// Allows frontend at specific URLs to talk to this backend
 const whitelist = process.env.CORS_ORIGIN
-  ? JSON.parse(process.env.CORS_ORIGIN)
-  : ["*"];
+  ? JSON.parse(process.env.CORS_ORIGIN) // e.g., ["http://localhost:3000"]
+  : ["*"]; // Fallback (Not recommended for production)
 
 app.use(
   cors({
-    origin: whitelist,// Allow only requests from this origin
-    credentials: true,
-    maxAge: 14400,
+    origin: whitelist, 
+    credentials: true, // Allow cookies to be sent
+    maxAge: 14400, // Cache preflight response for 4 hours
   })
 );
 
+// File Upload Middleware
 app.use(
   fileUpload({
     useTempFiles: true,
@@ -43,24 +68,32 @@ app.use(
   })
 );
 
-cloudinaryconnect();
 
-app.use("/api/v1/Patient", PatientRoutes);
+// =================================================================
+// API ROUTES
+// =================================================================
+// Base URL: http://localhost:5000/api/v1/...
 
-app.use("/api/v1/Admin", AdminRoutes);
+app.use("/api/v1/auth", AuthRoutes);           // Login, Signup, OTP
+app.use("/api/v1/Patient", PatientRoutes);     // Patient Profile & Ops
+app.use("/api/v1/Doctor", DoctorRoutes);       // Doctor Profile & Ops
+app.use("/api/v1/Admin", AdminRoutes);         // Admin Dashboard Ops
+app.use("/api/v1/medical-record", medicalRecordRoutes); // Clinical Records
 
-app.use("/api/v1/auth", AuthRoutes);
 
-app.use("/api/v1/Doctor", DoctorRoutes);
+// =================================================================
+// ROOT & SERVER START
+// =================================================================
 
-app.use("/api/v1/medical-record", medicalRecordRoutes);
-
+// Default Route (Health Check)
 app.get("/", (req, res) => {
   res.status(200).json({
-    message: "Welcome to the API",
+    success: true,
+    message: "Welcome to the Hospital Management API",
   });
 });
 
+// Start the Server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

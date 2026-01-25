@@ -2,87 +2,159 @@ const mongoose = require("mongoose");
 
 const doctorSchema = new mongoose.Schema(
     {
-        // --- Personal Details ---
-        firstName: { type: String, required: true, trim: true },
-        lastName: { type: String, required: true, trim: true },
-        email: { type: String, required: true, trim: true, unique: true }, // Added unique
-        password: { type: String, required: true },
-        
-        image: { type: String, required: true },
-        dob: { type: String, required: true }, // Format: YYYY-MM-DD
-        age: { type: Number, required: true },
-        gender: { type: String, required: true, enum: ["Male", "Female", "Other"] },
-        bloodGroup: { type: String, required: true }, // e.g., "O+", "A-"
-        address: { type: String, required: true },
-        phoneno: { type: String, required: true, trim: true }, // Changed to String
-        
-        // --- Professional Details ---
-        doctorID: { type: Number, unique: true }, // Auto-incrementing ID
+        // =================================================================
+        // PERSONAL DETAILS
+        // =================================================================
+        firstName: { 
+            type: String, 
+            required: true, 
+            trim: true 
+        },
+        lastName: { 
+            type: String, 
+            required: true, 
+            trim: true 
+        },
+        email: { 
+            type: String, 
+            required: true, 
+            trim: true, 
+            unique: true // Ensures no duplicate doctor accounts
+        },
+        password: { 
+            type: String, 
+            required: true 
+        },
+        image: { 
+            type: String, 
+            required: true // URL to profile picture
+        },
+        dob: { 
+            type: String, 
+            required: true // Format: YYYY-MM-DD
+        }, 
+        age: { 
+            type: Number, 
+            required: true 
+        },
+        gender: { 
+            type: String, 
+            required: true, 
+            enum: ["Male", "Female", "Other"] 
+        },
+        bloodGroup: { 
+            type: String, 
+            required: true // e.g., "O+", "A-"
+        },
+        address: { 
+            type: String, 
+            required: true 
+        },
+        phoneno: { 
+            type: String, 
+            required: true, 
+            trim: true // Stored as string to preserve leading zeros if any
+        },
+
+        // =================================================================
+        // PROFESSIONAL CREDENTIALS
+        // =================================================================
+        doctorID: { 
+            type: Number, 
+            unique: true // Custom Auto-Incremented ID (Starts at 1001)
+        },
         
         department: { 
             type: String, 
-            required: true 
-        }, // e.g., "Cardiology"
+            required: true // e.g., "Cardiology", "Neurology"
+        },
         
         specialization: { 
             type: String, 
-            trim: true 
-        }, // e.g., "Interventional Cardiologist"
+            trim: true // e.g., "Interventional Cardiologist"
+        },
         
         qualification: [{
-            degree: { type: String, required: true }, // e.g., "MBBS"
+            degree: { type: String, required: true }, // e.g., "MBBS", "MD"
             college: { type: String, required: true }, // e.g., "AIIMS Delhi"
-            year: { type: String }
+            year: { type: String } // Year of graduation
         }],
         
-        experience: { type: String, required: true }, // e.g., "12 Years"
+        experience: { 
+            type: String, 
+            required: true // e.g., "12 Years"
+        },
         
         consultationFee: {
             type: Number,
-            default: 0
+            default: 0 // Base charge per visit
         },
 
-        about: { type: String, trim: true },
+        about: { 
+            type: String, 
+            trim: true // Short bio/description
+        },
 
-        // --- Scheduling & Status ---
+        // =================================================================
+        // SCHEDULING & STATUS
+        // =================================================================
         status: {
             type: String,
             enum: ["Active", "On Leave", "Resigned"],
             default: "Active",
         },
         
-        // Simple availability tracking (Optional enhancement)
+        // Basic availability tracking (Can be expanded with TimeSlot model)
         availability: [{
             day: { type: String }, // e.g., "Monday"
             startTime: { type: String }, // "09:00"
             endTime: { type: String }    // "17:00"
         }],
 
-        // --- Relationships ---
+        // =================================================================
+        // RELATIONSHIPS
+        // =================================================================
         myAppointments: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: "Appointment",
         }],
         
-        // --- System Fields ---
-        accountType: { type: String, default: "Doctor" },
-        active: { type: Boolean, default: true },
-        token: { type: String },
-        resetPasswordExpires: { type: Date },
+        // =================================================================
+        // SYSTEM / METADATA FIELDS
+        // =================================================================
+        accountType: { 
+            type: String, 
+            default: "Doctor" 
+        },
+        active: { 
+            type: Boolean, 
+            default: true // Soft delete flag
+        },
+        token: { 
+            type: String // For auth persistence
+        },
+        resetPasswordExpires: { 
+            type: Date 
+        },
     },
-    { timestamps: true }
+    { 
+        timestamps: true // Automatically adds 'createdAt' and 'updatedAt'
+    }
 );
 
-// 🚀 AUTO-INCREMENT HOOK for doctorID
+// =================================================================
+// PRE-SAVE HOOK: AUTO-INCREMENT DOCTOR ID
+// =================================================================
 doctorSchema.pre("save", async function (next) {
+    // Only run logic if this is a new document
     if (this.isNew) {
         try {
-            const lastDoc = await mongoose.model("Doctor", doctorSchema)
-                .findOne({}, { doctorID: 1 })
+            // Find the doctor with the highest ID
+            const lastDoc = await this.constructor.findOne({}, { doctorID: 1 })
                 .sort({ doctorID: -1 })
                 .limit(1);
 
-            // Start IDs from 1000 to look professional, or 0 if you prefer
+            // If no doctor exists, start at 1001; otherwise increment
             this.doctorID = lastDoc && lastDoc.doctorID ? lastDoc.doctorID + 1 : 1001;
             next();
         } catch (error) {

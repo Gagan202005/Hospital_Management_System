@@ -328,7 +328,7 @@ export function ViewReportContent({ data }) {
                 </div>
             </div>
 
-            {/* Vitals */}
+            {/* Vitals - FIXED KEYS HERE */}
             <div>
                 <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-red-500"/> Clinical Vitals</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -338,11 +338,13 @@ export function ViewReportContent({ data }) {
                     </div>
                     <div className="border p-3 rounded bg-white text-center">
                         <span className="text-[10px] text-slate-400 uppercase font-bold">Pulse</span>
-                        <p className="text-lg font-semibold text-slate-800">{data.vitalSigns?.pulse || "--"} <span className="text-xs font-normal">bpm</span></p>
+                        {/* Fix: changed data.vitalSigns?.pulse to heartRate */}
+                        <p className="text-lg font-semibold text-slate-800">{data.vitalSigns?.heartRate || data.vitalSigns?.pulse || "--"} <span className="text-xs font-normal">bpm</span></p>
                     </div>
                     <div className="border p-3 rounded bg-white text-center">
                         <span className="text-[10px] text-slate-400 uppercase font-bold">Temp</span>
-                        <p className="text-lg font-semibold text-slate-800">{data.vitalSigns?.temp || "--"} <span className="text-xs font-normal">°F</span></p>
+                        {/* Fix: changed data.vitalSigns?.temp to temperature */}
+                        <p className="text-lg font-semibold text-slate-800">{data.vitalSigns?.temperature || data.vitalSigns?.temp || "--"} <span className="text-xs font-normal">°F</span></p>
                     </div>
                     <div className="border p-3 rounded bg-white text-center">
                         <span className="text-[10px] text-slate-400 uppercase font-bold">Weight</span>

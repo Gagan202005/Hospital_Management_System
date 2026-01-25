@@ -1,7 +1,6 @@
-import { toast as hotToast } from "react-hot-toast" // Renamed to avoid conflict with argument
-import { setLoading } from "../../Slices/authslice"
-import { apiConnector } from "../apiConnector"
-import { setProgress } from "../../Slices/loadingbarslice"
+import { toast as hotToast } from "react-hot-toast";
+import { setLoading } from "../../Slices/authslice";
+import { apiConnector } from "../apiConnector";
 import { Adminendpoints } from "../api";
 import { setUser } from "../../Slices/profileslice"; 
 
@@ -33,8 +32,9 @@ const {
 } = Adminendpoints;
 
 // --- 2. UPDATE ADMIN PROFILE ---
-export async function updateAdminProfile(profile, token, dispatch, toast) {
-  // Note: 'toast' here is the Shadcn function passed from the component
+export async function updateAdminProfile(profile, token, dispatch) {
+  // Removed 'toast' argument, using hotToast directly
+  const toastId = hotToast.loading("Updating Profile...");
   dispatch(setLoading(true));
   
   try {
@@ -60,12 +60,7 @@ export async function updateAdminProfile(profile, token, dispatch, toast) {
       throw new Error(response.data.message);
     }
 
-    // Use Shadcn Toast
-    toast({
-      title: "Success",
-      description: "Admin profile updated successfully.",
-      variant: "default",
-    });
+    hotToast.success("Admin profile updated successfully.");
     
     // Update Storage & Redux
     const updatedUser = response.data.data;
@@ -74,17 +69,16 @@ export async function updateAdminProfile(profile, token, dispatch, toast) {
 
   } catch (error) {
     console.log("UPDATE_ADMIN_PROFILE_API ERROR:", error);
-    toast({
-      title: "Update Failed",
-      description: error?.response?.data?.message || "Could not update profile.",
-      variant: "destructive",
-    });
+    hotToast.error(error?.response?.data?.message || "Could not update profile.");
   }
+  
   dispatch(setLoading(false));
+  hotToast.dismiss(toastId);
 }
 
 // --- 3. UPDATE ADMIN PFP ---
-export async function updateAdminPfp(token, pfp, dispatch, toast) {
+export async function updateAdminPfp(token, pfp, dispatch) {
+  const toastId = hotToast.loading("Uploading image...");
   try {
     const formData = new FormData();
     formData.append('pfp', pfp); 
@@ -103,10 +97,7 @@ export async function updateAdminPfp(token, pfp, dispatch, toast) {
       throw new Error(response.data.message);
     }
 
-    toast({
-      title: "Success",
-      description: "Profile picture updated.",
-    });
+    hotToast.success("Profile picture updated.");
     
     const imageUrl = response.data.data.image; 
     const user = JSON.parse(localStorage.getItem("user"));
@@ -116,11 +107,9 @@ export async function updateAdminPfp(token, pfp, dispatch, toast) {
 
   } catch (error) {
     console.log("UPDATE_ADMIN_PFP_API ERROR:", error);
-    toast({
-      title: "Upload Failed",
-      description: error?.response?.data?.message || "Could not upload image.",
-      variant: "destructive",
-    });
+    hotToast.error(error?.response?.data?.message || "Could not upload image.");
+  } finally {
+    hotToast.dismiss(toastId);
   }
 }
 
@@ -136,7 +125,7 @@ export const Add_Admin = async (data, token) => {
             throw new Error(response.data.message);
         }
         
-        // Return full response to access 'generatedPassword'
+        hotToast.success("Admin Added Successfully");
         return response.data;
 
     } catch (error) {
@@ -161,13 +150,12 @@ export const Add_Doctor = async (data, token, dispatch) => {
             throw new Error(response.data.message);
         }
         
-        // Return the full response so the component can access 'generatedPassword'
         return response.data;
 
     } catch (error) {
         console.log("ADD_DOCTOR_API ERROR:", error);
         hotToast.error(error?.response?.data?.message || "Failed to add doctor");
-        throw error; // Re-throw to stop component from clearing form
+        throw error; 
     } finally {
         hotToast.dismiss(toastId);
     }
@@ -179,8 +167,6 @@ export const Add_Doctor = async (data, token, dispatch) => {
 export const Delete_Doctor = async (id, token) => {
     const toastId = hotToast.loading("Deleting Doctor...");
     try {
-        // Send ID in the body (or query params depending on backend preference)
-        // Standard practice for DELETE with body in axios: { data: { id } }
         const response = await apiConnector("DELETE", DELETE_DOCTOR_API, { id }, {
             Authorization: `Bearer ${token}`,
         });
@@ -217,13 +203,10 @@ export const fetchAdminStats = async (token) => {
   }
 };
 
-
-
 // =================================================================
 // 1. GET ALL USERS (Common Function)
 // =================================================================
 export const getAllUsers = async (token, type) => {
-  // type can be "patient", "doctor", or "admin"
   let result = [];
   try {
     const response = await apiConnector(
@@ -238,7 +221,6 @@ export const getAllUsers = async (token, type) => {
     }
 
     result = response.data.data;
-    console.log(response);
 
   } catch (error) {
     console.log(`GET ALL ${type.toUpperCase()} ERROR:`, error);
@@ -263,8 +245,6 @@ export const Add_Patient = async (data, token) => {
       throw new Error(response.data.message);
     }
     
-    // We do NOT show a generic success toast here because 
-    // the component will show the custom Password Toast.
     result = response.data;
 
   } catch (error) {
@@ -322,9 +302,6 @@ export const Delete_Patient = async (patientId, token) => {
   hotToast.dismiss(toastId);
 };
 
-
-
-
 export const Update_Doctor = async (data, token) => {
     const toastId = hotToast.loading("Updating Doctor...");
     try {
@@ -345,9 +322,6 @@ export const Update_Doctor = async (data, token) => {
         hotToast.dismiss(toastId);
     }
 };
-
-
-
 
 export const Add_Ambulance = async (data, token) => {
     const toastId = hotToast.loading("Adding Ambulance...");
@@ -417,7 +391,7 @@ export const Book_Ambulance = async (data, token) => {
         });
         if (!response.data.success) throw new Error(response.data.message);
         hotToast.success(response.data.message);
-        return true; // Success
+        return true; 
     } catch (error) {
         hotToast.error(error.response?.data?.message || "Booking Failed");
         return false;
@@ -440,7 +414,6 @@ export const Complete_Trip = async (ambulanceId, token) => {
         hotToast.dismiss(toastId);
     }
 };
-
 
 // --- CRUD ---
 export const Add_Bed = async (data, token) => {

@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../../ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "../../ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Calendar } from "../../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { format } from "date-fns";
-import { CalendarIcon, ArrowLeft, User, Loader2, IndianRupee, AlertCircle, LogIn, Lock } from "lucide-react";
+import { CalendarIcon, ArrowLeft, User, Loader2, IndianRupee, AlertCircle, Lock, LogIn } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { useToast } from "../../../hooks/use-toast";
 import { useSelector } from "react-redux";
@@ -44,6 +44,17 @@ const BookAppointment = () => {
     symptoms: ""
   });
 
+  // --- VALIDATION CHECK ---
+  const isFormValid = 
+    selectedDate && 
+    selectedSlotId && 
+    formData.firstName.trim() !== "" &&
+    formData.lastName.trim() !== "" &&
+    formData.email.trim() !== "" &&
+    formData.phone.trim() !== "" &&
+    formData.reason.trim() !== "" &&
+    formData.symptoms.trim() !== "";
+
   // --- 1. Load Doctor ---
   useEffect(() => {
     const loadDoctor = async () => {
@@ -69,7 +80,14 @@ const BookAppointment = () => {
 
   const handleBook = async () => {
     if (!token) { toast.error("Please login first"); return navigate("/login"); }
-    if (!selectedDate || !selectedSlotId || !formData.reason) { return toast.error("Please fill all required fields"); }
+    
+    if (!isFormValid) { 
+        return toast({
+            title: "Missing Information", 
+            description: "Please fill all required fields marked with *",
+            variant: "destructive"
+        }); 
+    }
 
     setIsBooking(true);
     const payload = { doctorId: id, date: format(selectedDate, "yyyy-MM-dd"), timeSlotId: selectedSlotId, ...formData };
@@ -80,9 +98,9 @@ const BookAppointment = () => {
   // --- Guest View ---
   if (!token) {
       return (
-        <div className="flex flex-col min-h-screen bg-slate-50">
+        <div className="flex flex-col min-h-screen bg-slate-50 mt-[150px]">
             <div className="fixed top-0 w-full z-50"><Navbar /></div>
-            <main className="flex-1 flex items-center justify-center pt-20 px-4">
+            <main className="flex-1 flex items-center justify-center pt-20 px-4 mb-[50px]">
                 <Card className="max-w-md w-full text-center p-6 shadow-lg border-t-4 border-t-blue-600">
                     <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600">
                         <Lock className="w-8 h-8" />
@@ -116,7 +134,7 @@ const BookAppointment = () => {
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back
                 </Button>
                 <div className="flex items-center gap-4">
-                    <img src={doctor.image} className="w-16 h-16 rounded-full object-cover border border-slate-200"/>
+                    <img src={doctor.image} className="w-16 h-16 rounded-full object-cover border border-slate-200" alt="Doctor"/>
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900">Book Appointment</h1>
                         <p className="text-slate-500">Dr. {doctor.firstName} {doctor.lastName} • {doctor.specialization}</p>
@@ -130,11 +148,12 @@ const BookAppointment = () => {
                 
                 {/* FORM */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* Schedule Section */}
                     <Card className="shadow-sm border-slate-200">
                         <CardHeader><CardTitle className="text-lg flex gap-2 items-center"><CalendarIcon className="w-5 h-5 text-blue-600"/> Select Schedule</CardTitle></CardHeader>
                         <CardContent className="grid md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <Label>Date</Label>
+                                <Label>Date <span className="text-red-500">*</span></Label>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
@@ -147,7 +166,7 @@ const BookAppointment = () => {
                                 </Popover>
                             </div>
                             <div className="space-y-2">
-                                <Label>Time Slot</Label>
+                                <Label>Time Slot <span className="text-red-500">*</span></Label>
                                 <Select value={selectedSlotId} onValueChange={(val) => {setSelectedSlotId(val); setDisplayTime(availableSlots.find(s=>s._id===val)?.startTime);}} disabled={!selectedDate || loadingSlots}>
                                     <SelectTrigger><SelectValue placeholder={loadingSlots ? "Loading..." : "Select Time"} /></SelectTrigger>
                                     <SelectContent>
@@ -158,23 +177,36 @@ const BookAppointment = () => {
                         </CardContent>
                     </Card>
 
+                    {/* Details Section */}
                     <Card className="shadow-sm border-slate-200">
                         <CardHeader><CardTitle className="text-lg flex gap-2 items-center"><User className="w-5 h-5 text-blue-600"/> Personal Details</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>First Name</Label><Input value={formData.firstName} onChange={(e)=>setFormData({...formData, firstName:e.target.value})} disabled className="bg-slate-50"/></div>
-                                <div className="space-y-2"><Label>Last Name</Label><Input value={formData.lastName} onChange={(e)=>setFormData({...formData, lastName:e.target.value})} disabled className="bg-slate-50"/></div>
+                                <div className="space-y-2">
+                                    <Label>First Name <span className="text-red-500">*</span></Label>
+                                    <Input value={formData.firstName} onChange={(e)=>setFormData({...formData, firstName:e.target.value})} className="bg-slate-50"/>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Last Name <span className="text-red-500">*</span></Label>
+                                    <Input value={formData.lastName} onChange={(e)=>setFormData({...formData, lastName:e.target.value})} className="bg-slate-50"/>
+                                </div>
                             </div>
                             <div className="grid md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>Email</Label><Input value={formData.email} onChange={(e)=>setFormData({...formData, email:e.target.value})} disabled className="bg-slate-50"/></div>
-                                <div className="space-y-2"><Label>Phone</Label><Input value={formData.phone} onChange={(e)=>setFormData({...formData, phone:e.target.value})} disabled className="bg-slate-50"/></div>
+                                <div className="space-y-2">
+                                    <Label>Email <span className="text-red-500">*</span></Label>
+                                    <Input value={formData.email} onChange={(e)=>setFormData({...formData, email:e.target.value})} className="bg-slate-50"/>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Phone <span className="text-red-500">*</span></Label>
+                                    <Input value={formData.phone} onChange={(e)=>setFormData({...formData, phone:e.target.value})} className="bg-slate-50"/>
+                                </div>
                             </div>
                             <div className="space-y-2">
-                                <Label>Reason for Visit *</Label>
+                                <Label>Reason for Visit <span className="text-red-500">*</span></Label>
                                 <Input value={formData.reason} onChange={(e)=>setFormData({...formData, reason:e.target.value})} placeholder="e.g. Fever, Consultation"/>
                             </div>
                             <div className="space-y-2">
-                                <Label>Symptoms (Optional)</Label>
+                                <Label>Symptoms <span className="text-red-500">*</span></Label>
                                 <Input value={formData.symptoms} onChange={(e)=>setFormData({...formData, symptoms:e.target.value})} placeholder="Briefly describe..."/>
                             </div>
                         </CardContent>
@@ -207,9 +239,19 @@ const BookAppointment = () => {
                                 <span>Your request will be pending confirmation. You will receive an email update shortly.</span>
                             </div>
 
-                            <Button className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-lg" onClick={handleBook} disabled={isBooking || !selectedDate || !selectedSlotId}>
+                            <Button 
+                                className={`w-full h-12 text-lg ${!isFormValid ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                onClick={handleBook} 
+                                disabled={isBooking || !isFormValid}
+                            >
                                 {isBooking ? <Loader2 className="animate-spin mr-2"/> : "Confirm Booking"}
                             </Button>
+                            
+                            {!isFormValid && (
+                                <p className="text-xs text-center text-red-500">
+                                    * Please complete all required fields
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

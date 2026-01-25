@@ -136,10 +136,32 @@ export const AddAmbulanceSection = () => {
                                 <div className="flex items-center gap-2"><h4 className="font-bold text-slate-900">{amb.vehicleNumber}</h4><Badge className={amb.isAvailable ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-red-100 text-red-700 hover:bg-red-100"}>{amb.isAvailable ? "Available" : "On Duty"}</Badge></div>
                                 <p className="text-xs text-slate-500 mt-1">{amb.model} • {amb.driverName} ({amb.driverContact})</p>
                             </div>
+                            
+                            {/* --- MODIFIED BUTTONS START --- */}
                             <div className="flex gap-1">
-                                <Button variant="ghost" size="icon" onClick={()=>handleEditClick(amb)} className="h-7 w-7 text-blue-600"><Edit className="w-3 h-3"/></Button>
-                                <Button variant="ghost" size="icon" onClick={()=>handleDelete(amb._id)} className="h-7 w-7 text-red-500"><Trash2 className="w-3 h-3"/></Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={()=>handleEditClick(amb)} 
+                                  disabled={!amb.isAvailable}
+                                  title={!amb.isAvailable ? "Cannot modify while On Duty" : "Edit Details"}
+                                  className={`h-7 w-7 ${!amb.isAvailable ? "text-slate-300 cursor-not-allowed" : "text-blue-600"}`}
+                                >
+                                  <Edit className="w-3 h-3"/>
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={()=>handleDelete(amb._id)} 
+                                  disabled={!amb.isAvailable}
+                                  title={!amb.isAvailable ? "Cannot delete while On Duty" : "Delete Vehicle"}
+                                  className={`h-7 w-7 ${!amb.isAvailable ? "text-slate-300 cursor-not-allowed" : "text-red-500"}`}
+                                >
+                                  <Trash2 className="w-3 h-3"/>
+                                </Button>
                             </div>
+                            {/* --- MODIFIED BUTTONS END --- */}
+
                         </div>
                         <div className="mt-3 pt-3 border-t border-dashed border-slate-200 flex justify-between items-center">
                             {!amb.isAvailable ? <div className="text-xs text-red-600 font-medium">To: {amb.currentTrip?.address}</div> : <div className="text-xs text-green-600">Ready for dispatch</div>}

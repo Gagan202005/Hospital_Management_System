@@ -1,13 +1,13 @@
 import './App.css';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { jwtDecode } from "jwt-decode";
 
 // Components
 import OpenRoute from './Components/Common/Openroute.jsx';
 import PrivateRoute from './Components/Common/Privateroute.jsx';
 import { Toaster } from './Components/ui/toaster';
-import { setProgress } from "./Slices/loadingbarslice";
-import Navbar from './Components/Common/Navbar'; // Import here just for Public pages if needed, or handle inside them too.
+import ScrollToTop from './Components/Common/ScrollToTop.jsx';
 
 // Pages
 import Home from "./Pages/Home";
@@ -17,13 +17,14 @@ import Verify_email from './Pages/Verify-email.jsx';
 import FindDoctor from './Pages/FindDoctor.jsx';
 import About from './Pages/About.jsx';
 import Contact from './Pages/Contact.jsx';
+import AiChat from "./Pages/AI_Help.jsx";
 
 // Dashboards
 import DoctorDashboard from './Pages/DoctorDashboard';
 import PatientDashboard from './Pages/PatientDashboard';
 import AdminDashboard from './Pages/AdminDashboard';
 
-// Sub-Sections
+// Sub-Sections (Find Doctor)
 import DoctorProfile from './Components/Core/FindDoctor/DoctorProfile.jsx';
 import BookAppointment from './Components/Core/FindDoctor/BookAppointmentSection.jsx';
 
@@ -50,25 +51,54 @@ import PatientProfileSection from "./Components/Core/Patient/PatientProfileSecti
 import PatientOverview from "./Components/Core/Patient/PatientOverview";
 
 function App() {
-  const user = useSelector((state) => state.profile.user);
-  const progress = useSelector((state) => state.loadingBar);
+  const navigate = useNavigate();
+
+  // --- AUTOMATIC LOGOUT ON TOKEN EXPIRY ---
+  useEffect(() => {
+    const checkTokenExpiration = () => {
+      const token = localStorage.getItem("token");
+      if (token) {
+        try {
+          // Decode token to find expiration time (exp is in seconds)
+          const decodedToken = jwtDecode(token);
+          const currentTime = Date.now() / 1000;
+
+          // If token expired, clear storage and kick user out
+          if (decodedToken.exp < currentTime) {
+            console.warn("Session expired. Logging out...");
+            localStorage.clear();
+            navigate("/login");
+          }
+        } catch (error) {
+          // If token is malformed/corrupt
+          console.error("Invalid token detected.", error);
+          localStorage.clear();
+          navigate("/login");
+        }
+      }
+    };
+
+    checkTokenExpiration();
+  }, [navigate]);
 
   return (
     <div>
+      <ScrollToTop />
       <Routes>
         {/* --- AUTH --- */}
         <Route path="/login" element={<OpenRoute><Login /></OpenRoute>} />
         <Route path="/signup" element={<OpenRoute><Signup /></OpenRoute>} />
         <Route path='/verify-email' element={<Verify_email />} />
-
+        
         {/* --- PUBLIC --- */}
-        {/* Note: Ensure Home/FindDoctor have <Navbar/> inside them if you want it there */}
         <Route path="/" element={<Home />} />
         <Route path="/find-doctor" element={<FindDoctor />} />
         <Route path="/doctor/:id" element={<DoctorProfile />} />
         <Route path="/doctor/:id/book" element={<BookAppointment />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/ai-chat" element={<AiChat />} />
+
         {/* --- ADMIN DASHBOARD --- */}
         <Route 
           path="/admin-dashboard" 

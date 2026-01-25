@@ -58,24 +58,6 @@ exports.isPatient= async(req,res,next) => {
 }
 
 
-exports.isNurse= async(req,res,next) => {
-    try{
-        if(req.user.accountType!=="Nurse"){
-            return res.status(401)({
-                success:false,
-                message:"this is a protected route for nurse only",
-            });
-        }
-        next();
-    }
-    catch(error) {
-        return res.status(500).json({
-            success:false,
-            message:'User role cannot be verified, please try again'
-        })
-    }
-}
-
 exports.isDoctor= async(req,res,next) => {
     try{
         if(req.user.accountType!=="Doctor"){

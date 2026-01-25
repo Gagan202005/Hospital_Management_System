@@ -4,7 +4,8 @@ import { Button } from "../Components/ui/button";
 import { Input } from "../Components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../Components/ui/select";
 import { Search, Stethoscope, Users, Award, Star, Loader2 } from "lucide-react";
-import hospitalHero from "../img/hospital-hero.jpg"; // Adjust path
+// import hospitalHero from "../img/hospital-hero.jpg"; // Adjust path
+import hospitalHero from "../img/dep1.jpg";
 import Navbar from "../Components/Common/Navbar";
 import Footer from "../Components/Common/Footer";
 

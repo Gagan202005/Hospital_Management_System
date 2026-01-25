@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { 
-  Calendar, Users, CheckCircle2, Clock, Plus, CalendarDays, Activity 
+  Calendar, Users, CheckCircle2, Clock, Plus, CalendarDays, Activity, Clock3
 } from "lucide-react";
 import { Button } from "../../ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../ui/card";
@@ -145,20 +145,33 @@ export default function DoctorOverview() {
                 stats.recentActivity.map((appt, index) => (
                   <div key={index} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-3">
-                        <div className="bg-blue-100 text-blue-600 font-bold h-10 w-10 rounded-full flex items-center justify-center">
+                        <div className="bg-slate-100 text-slate-600 font-bold h-10 w-10 rounded-full flex items-center justify-center border border-slate-200">
                             {appt.patientDetails?.firstName?.[0]}
                         </div>
                         <div>
                             <span className="font-semibold text-slate-800 block">
                                 {appt.patientDetails?.firstName} {appt.patientDetails?.lastName}
                             </span>
-                            <span className="text-xs text-slate-500">
-                                {new Date(appt.date).toLocaleDateString()}
-                            </span>
+                            
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-xs text-slate-500">
+                                    {new Date(appt.date).toLocaleDateString()}
+                                </span>
+                                
+                                {/* DYNAMIC STATUS BADGE */}
+                                {appt.status === "Confirmed" ? (
+                                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 border border-emerald-200">
+                                        <CheckCircle2 className="w-2.5 h-2.5" /> Confirmed
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 border border-blue-200">
+                                        <Clock3 className="w-2.5 h-2.5" /> Pending
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    <div className="flex items-center text-blue-700 bg-blue-50 px-3 py-1 rounded-full text-xs font-semibold">
-                       <Clock className="w-3 h-3 mr-1" />
+                    <div className="flex items-center text-slate-700 bg-white border border-slate-200 px-3 py-1 rounded-md text-xs font-semibold">
                        {appt.timeSlot}
                     </div>
                   </div>

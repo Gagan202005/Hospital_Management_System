@@ -1,8 +1,15 @@
 const Doctor = require("../models/Doctor");
 const Appointment = require("../models/Appointment");
-const TimeSlot = require("../models/Slot"); // Ensure filename matches your model (e.g., TimeSlot.js)
-const Patient = require("../models/Patient"); // Kept if you plan to use it later
-const mailSender = require("../utils/mailSender"); // Ensure you have this utility
+const TimeSlot = require("../models/Slot"); 
+const Patient = require("../models/Patient"); 
+const mailSender = require("../utils/mailSender"); 
+const appointmentPendingTemplate = require("../mail/templates/AppointmentPendingMail");
+
+// Helper to prevent Regex Injection (Server Crash)
+function escapeRegex(text) {
+  return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+}
+
 // =============================================
 // UPDATE DOCTOR PROFILE
 // =============================================
@@ -14,15 +21,15 @@ exports.updateDoctorProfile = async (req, res) => {
         const {
             firstName,
             lastName,
-            phoneno,       // <--- Added Field
-            address,       // <--- Added Field
+            phoneno,       
+            address,       
             dob,
             age,
             gender,
             bloodGroup,
             department,
             specialization,
-            qualification, // Array
+            qualification, 
             experience,
             consultationFee,
             about
@@ -38,17 +45,14 @@ exports.updateDoctorProfile = async (req, res) => {
         if (firstName) doctor.firstName = firstName;
         if (lastName) doctor.lastName = lastName;
         
-        // --- Contact Details ---
         if (phoneno) doctor.phoneno = phoneno;
         if (address) doctor.address = address;
 
-        // --- Personal Details ---
         if (dob) doctor.dob = dob;
         if (age) doctor.age = age;
         if (gender) doctor.gender = gender;
         if (bloodGroup) doctor.bloodGroup = bloodGroup;
 
-        // --- Professional Details ---
         if (department) doctor.department = department;
         if (specialization) doctor.specialization = specialization;
         if (qualification) doctor.qualification = qualification;
@@ -74,7 +78,6 @@ exports.updateDoctorProfile = async (req, res) => {
         });
     }
 };
-
 
 
 // =================================================================
@@ -149,7 +152,6 @@ exports.getTimeSlots = async (req, res) => {
 };
 
 
-
 // =================================================================
 // 3. PUBLIC SEARCH & DETAILS (Patient View)
 // =================================================================
@@ -163,9 +165,10 @@ exports.getPublicDoctors = async (req, res) => {
       active: true 
     };
 
-    // 1. Handle Search Text
+    // 1. Handle Search Text (SECURE FIX: Escape Regex)
     if (searchQuery) {
-      const regex = new RegExp(searchQuery, "i");
+      const safeSearch = escapeRegex(searchQuery); // Prevents Server Crash
+      const regex = new RegExp(safeSearch, "i");
       query.$or = [
         { firstName: regex },
         { lastName: regex },
@@ -249,17 +252,15 @@ exports.getDoctorDetails = async (req, res) => {
 exports.getAvailableSlots = async (req, res) => {
   try {
     const { doctorId } = req.params;
-    const { date } = req.query; // Format: YYYY-MM-DD
+    const { date } = req.query; 
 
     if (!date || !doctorId) {
       return res.status(400).json({ success: false, message: "Date and Doctor ID required" });
     }
 
-    // Normalize date to UTC Midnight to match TimeSlot storage
     const queryDate = new Date(date);
     queryDate.setUTCHours(0, 0, 0, 0);
 
-    // Fetch slots that are NOT booked
     const availableSlots = await TimeSlot.find({
       doctorId: doctorId,
       date: queryDate,
@@ -292,13 +293,18 @@ exports.bookAppointment = async (req, res) => {
     }
     const patientId = req.user.id;
 
-    // 2. Verify Slot
-    const slotDoc = await TimeSlot.findById(timeSlotId);
+    // 2. ATOMIC LOCK (Prevents Double Booking)
+    const slotDoc = await TimeSlot.findOneAndUpdate(
+        { _id: timeSlotId, isBooked: false },
+        { isBooked: true },
+        { new: true }
+    );
+
     if (!slotDoc) {
-      return res.status(404).json({ success: false, message: "Time slot not found" });
-    }
-    if (slotDoc.isBooked) {
-      return res.status(400).json({ success: false, message: "This slot is already booked" });
+      return res.status(400).json({ 
+          success: false, 
+          message: "This slot has just been booked by another user. Please choose another." 
+      });
     }
 
     // 3. Create Appointment (Status: Pending)
@@ -311,35 +317,35 @@ exports.bookAppointment = async (req, res) => {
       timeSlot: slotDoc.startTime,
       reason,
       symptoms,
-      status: "Pending" // Changed from Scheduled to Pending
+      status: "Pending"
     });
 
-    // 4. Mark Slot as Booked
-    slotDoc.isBooked = true;
+    // 4. Link Appointment ID back to Slot
     slotDoc.appointmentId = newAppointment._id;
     await slotDoc.save();
 
     // 5. Send Email Notification
     try {
-      const emailBody = `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2 style="color: #4F46E5;">Appointment Request Received</h2>
-          <p>Dear ${firstName},</p>
-          <p>Your appointment request has been received and is currently in a <strong>Pending</strong> state.</p>
-          <p><strong>Details:</strong><br/>
-             Date: ${new Date(date).toDateString()}<br/>
-             Time: ${slotDoc.startTime}
-          </p>
-          <p>We will notify you via email once the doctor confirms your visit or if there are any changes.</p>
-          <hr/>
-          <p style="font-size: 12px; color: #666;">Note: No payment is required online. Consultation fees are collected at the hospital.</p>
-        </div>
-      `;
+      // NEW: Fetch Doctor details specifically for the email
+      const doctorDetails = await Doctor.findById(doctorId).select("firstName lastName department");
+
+      const emailContent = appointmentPendingTemplate(
+          firstName, 
+          slotDoc.date,      
+          slotDoc.startTime, 
+          reason,
+          // NEW: Pass Doctor Data
+          `${doctorDetails.firstName} ${doctorDetails.lastName}`, 
+          doctorDetails.department
+      );
       
-      await mailSender(email, "Appointment Request Pending", emailBody);
+      await mailSender(
+          email, 
+          "Appointment Request Pending | MediCare", 
+          emailContent
+      );
     } catch (mailError) {
       console.error("Email sending failed:", mailError);
-      // Continue execution, don't fail the booking
     }
 
     return res.status(200).json({
@@ -354,50 +360,83 @@ exports.bookAppointment = async (req, res) => {
   }
 };
 
+
+// =================================================================
+// 6. GET DOCTOR PATIENTS
+// =================================================================
+
 exports.getDoctorPatients = async (req, res) => {
   try {
     const doctorId = req.user.id;
     const now = new Date();
 
-    // Fetch all appointments sorted by newest first
-    const appointments = await Appointment.find({ doctor: doctorId }).sort({ date: -1 });
+    // 1. POPULATE PATIENT: Fetches the live profile data (Address, Blood Group, etc.)
+    const appointments = await Appointment.find({ doctor: doctorId })
+      .populate("patient") // <--- This is the key fix
+      .sort({ date: -1 });
 
     const patientMap = new Map();
 
     appointments.forEach((appt) => {
-      const email = appt.patientDetails.email;
+      // Use the Live Profile email if available, otherwise fallback to the snapshot
+      // (This handles cases where a user might have deleted their account but the appointment remains)
+      const email = appt.patient ? appt.patient.email : appt.patientDetails.email;
 
       if (!patientMap.has(email)) {
+        
+        // Define sources for data
+        const profile = appt.patient || {};
+        const snapshot = appt.patientDetails || {};
+
         patientMap.set(email, {
           id: appt._id, 
-          name: `${appt.patientDetails.firstName} ${appt.patientDetails.lastName || ""}`.trim(),
-          email: appt.patientDetails.email,
-          phone: appt.patientDetails.phone,
+          
+          // Name: Prefer Live Profile -> Fallback to Snapshot
+          name: profile.firstName 
+            ? `${profile.firstName} ${profile.lastName}` 
+            : `${snapshot.firstName} ${snapshot.lastName}`,
+            
+          email: email,
+          phone: profile.phoneno || snapshot.phone || "N/A",
+          
+          // --- FULL DETAILS NOW AVAILABLE ---
+          gender: profile.gender || "Not specified",
+          bloodGroup: profile.bloodGroup || "Not specified",
+          address: profile.address || "No address on file",
+          
           visitCount: 0,
-          lastVisit: null,  
-          status: "Inactive", // Default
-          history: []       // We will fill this
+          lastVisit: null,
+          nextVisit: null,
+          status: "Inactive",
+          history: []
         });
       }
 
       const patient = patientMap.get(email);
       patient.visitCount += 1;
-
-      // Determine Status & Primary Date
       const apptDate = new Date(appt.date);
-      
-      if (apptDate > now) {
-          patient.status = "Active"; // They have an upcoming booking
-          patient.lastVisit = appt.date; // Show next visit date
-      } else if (!patient.lastVisit && patient.status !== "Active") {
-          patient.lastVisit = appt.date; // Show last past visit
+
+      // --- DATE LOGIC ---
+      // Future: Confirmed or Pending appointments count as "Next Visit"
+      if (apptDate > now && (appt.status === "Confirmed" || appt.status === "Pending")) {
+          patient.status = "Active"; 
+          // Find the earliest upcoming date
+          if (!patient.nextVisit || apptDate < new Date(patient.nextVisit)) {
+             patient.nextVisit = appt.date;
+          }
+      } else {
+          // Past: Only Completed appointments count as "Last Visit"
+          // (We ignore Cancelled here so "Last Visit" means last actual consultation)
+          if (!patient.lastVisit && appt.status === "Completed") {
+              patient.lastVisit = appt.date;
+          }
       }
 
-      // Add to history list
+      // Add to full history list (Includes Cancelled)
       patient.history.push({
         date: appt.date,
         reason: appt.reason,
-        status: appt.status // Scheduled/Completed/Cancelled
+        status: appt.status
       });
     });
 
@@ -405,20 +444,20 @@ exports.getDoctorPatients = async (req, res) => {
       success: true,
       data: Array.from(patientMap.values()),
     });
+
   } catch (error) {
+    console.error("GET_PATIENTS_ERROR:", error);
     return res.status(500).json({ success: false, message: "Error fetching patients" });
   }
 };
 
 // =================================================================
-// 1. GET APPOINTMENT SCHEDULE (Flat List for Appointments Page)
+// 6. APPOINTMENT SCHEDULE
 // =================================================================
 exports.getDoctorAppointments = async (req, res) => {
   try {
-    const doctorId = req.user.id; // From Auth Middleware
+    const doctorId = req.user.id; 
 
-    // Fetch appointments sorted by date (Ascending: Earliest first)
-    // .lean() converts mongoose docs to plain JS objects for performance
     const appointments = await Appointment.find({ doctor: doctorId })
       .sort({ date: 1 }) 
       .lean(); 
@@ -439,24 +478,23 @@ exports.getDoctorAppointments = async (req, res) => {
   }
 };
 
-// ==========================================
-// UPDATE APPOINTMENT STATUS
-// ==========================================
+
+// =================================================================
+// 7. UPDATE APPOINTMENT STATUS
+// =================================================================
 exports.updateAppointmentStatus = async (req, res) => {
   try {
     const { appointmentId, status } = req.body; 
 
-    // 1. Find Appointment with Patient Details
-    const appointment = await Appointment.findById(appointmentId).populate("patient"); // Ensure patient email is available
+    const appointment = await Appointment.findById(appointmentId).populate("patient"); 
     if (!appointment) {
       return res.status(404).json({ success: false, message: "Appointment not found" });
     }
 
-    // 2. Update Status
     appointment.status = status;
     await appointment.save();
 
-    // 3. Logic: If Cancelled, Free up TimeSlot
+    // If Cancelled, Free up TimeSlot
     if (status === "Cancelled" && appointment.timeSlotId) {
        await TimeSlot.findByIdAndUpdate(appointment.timeSlotId, { 
            isBooked: false, 
@@ -465,23 +503,10 @@ exports.updateAppointmentStatus = async (req, res) => {
        appointment.timeSlotId = null;
     }
 
-    // 4. Send Email Notification
     if (appointment.patientDetails?.email) {
         try {
             let subject = `Appointment Status Update: ${status}`;
-            let body = "";
-
-            if (status === "Confirmed") {
-                body = `<p>Your appointment has been <strong>CONFIRMED</strong> by the doctor.</p>
-                        <p>Please arrive 15 minutes early at the hospital counter for payment.</p>`;
-            } else if (status === "Cancelled") {
-                body = `<p>Your appointment has been <strong>CANCELLED</strong>.</p>
-                        <p>Reason: Administrative/Doctor Unavailable.</p>
-                        <p>You can book a new slot via the portal.</p>`;
-            } else {
-                body = `<p>Your appointment status has changed to: <strong>${status}</strong>.</p>`;
-            }
-
+            let body = `<p>Your appointment status has changed to: <strong>${status}</strong>.</p>`;
             await mailSender(appointment.patientDetails.email, subject, body);
         } catch (mailError) {
             console.error("Mail Error:", mailError);
@@ -500,19 +525,19 @@ exports.updateAppointmentStatus = async (req, res) => {
   }
 };
 
-// ==========================================
-// DELETE TIME SLOT (Protected)
-// ==========================================
+
+// =================================================================
+// 8. DELETE TIME SLOT
+// =================================================================
 exports.deleteTimeSlot = async (req, res) => {
     try {
-        const { slotId } = req.body; // Or req.params depending on your route
+        const { slotId } = req.body;
 
         const slot = await TimeSlot.findById(slotId);
         if (!slot) {
             return res.status(404).json({ success: false, message: "Slot not found" });
         }
 
-        // PROTECTION: Cannot delete if booked
         if (slot.isBooked) {
             return res.status(400).json({ 
                 success: false, 
@@ -529,55 +554,76 @@ exports.deleteTimeSlot = async (req, res) => {
     }
 };
 
+
+// =================================================================
+// 9. DASHBOARD STATS (Fixed Populate)
+// =================================================================
 exports.getDoctorDashboardStats = async (req, res) => {
   try {
     const doctorId = req.user.id;
+    const currentMoment = new Date();
 
-    // 1. Get Doctor Details (for name)
     const doctor = await Doctor.findById(doctorId).select("firstName lastName");
 
-    // 2. Define Time Ranges
+    // --- AUTO-CANCEL EXPIRED PENDING APPOINTMENTS ---
+    const expiredAppointments = await Appointment.find({
+      doctor: doctorId,
+      status: "Pending",
+      date: { $lt: currentMoment }
+    }); 
+    // FIX: Removed invalid .populate("patientDetails") since it is an embedded object
+
+    if (expiredAppointments.length > 0) {
+      for (const appt of expiredAppointments) {
+        appt.status = "Cancelled";
+        await appt.save();
+
+        if (appt.patientDetails?.email) {
+          try {
+            await mailSender(
+              appt.patientDetails.email,
+              "Appointment Cancelled - No Show / Expired",
+              `<p>Your pending appointment for ${new Date(appt.date).toDateString()} has expired.</p>`
+            );
+          } catch (e) { console.error("Mail fail", e); }
+        }
+      }
+    }
+
+    // --- STATS ---
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    // 3. Count Today's Appointments
     const todayAppointmentsCount = await Appointment.countDocuments({
       doctor: doctorId,
       date: { $gte: startOfDay, $lte: endOfDay },
-      status: { $ne: "Cancelled" } // Exclude cancelled
+      status: { $ne: "Cancelled" }
     });
 
-    // 4. Count Total Unique Patients
-    // We get all distinct patient IDs from appointments associated with this doctor
-    const uniquePatients = await Appointment.distinct("patient", {
-      doctor: doctorId
-    });
-    const totalPatientsCount = uniquePatients.length;
-
-    // 5. Count Total Completed Appointments (Lifetime)
+    const uniquePatients = await Appointment.distinct("patient", { doctor: doctorId });
+    
     const totalCompletedCount = await Appointment.countDocuments({
       doctor: doctorId,
       status: "Completed"
     });
 
-    // 6. Get Recent/Upcoming Activity (Next 3 Appointments)
     const recentAppointments = await Appointment.find({
         doctor: doctorId,
-        status: "Scheduled",
-        date: { $gte: new Date() } // Future dates only
+        status: { $in: ["Pending", "Confirmed"] },
+        date: { $gte: currentMoment }
     })
-    .sort({ date: 1, timeSlot: 1 }) // Earliest first
-    .limit(3)
-    .populate("patientDetails", "firstName lastName");
+    .sort({ date: 1, timeSlot: 1 })
+    .limit(3);
+    // FIX: Removed invalid .populate("patientDetails")
 
     return res.status(200).json({
       success: true,
       data: {
         doctorName: `${doctor.firstName} ${doctor.lastName}`,
         todayCount: todayAppointmentsCount,
-        totalPatients: totalPatientsCount,
+        totalPatients: uniquePatients.length,
         totalCompleted: totalCompletedCount,
         recentActivity: recentAppointments
       }

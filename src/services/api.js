@@ -11,13 +11,14 @@ export const endpoints = {
   RESETPASSWORD_API: BASE_URL + "/auth/reset-password",
   CHANGE_PASSWORD_API : BASE_URL + "/auth/change-password",
   CONTACT_US_API: BASE_URL + "/auth/contact",
+  GEMINI_CHAT_API : BASE_URL + "/auth/chat",
 };
 
 export const profendpoints = {
   PATIENT_EDITPROFILE_API : BASE_URL + "/Patient/editprofile",
   PATIENT_UPDATEDISPLAYPICTURE_API : BASE_URL + "/Patient/updateDisplayPicture",
-  PATIENT_APPOINTMENTS_API: BASE_URL + "/patient/appointments",
-  GET_PATIENT_DASHBOARD_API : BASE_URL + "/patient/dashboard-stats",
+  PATIENT_APPOINTMENTS_API: BASE_URL + "/Patient/appointments",
+  GET_PATIENT_DASHBOARD_API : BASE_URL + "/Patient/dashboard-stats",
 }
 
 export const Adminendpoints = {

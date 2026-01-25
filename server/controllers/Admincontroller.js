@@ -4,7 +4,6 @@ const bcrypt = require("bcrypt");
 const Appointment = require("../models/Appointment");
 const Admin = require("../models/Admin");
 const Bed = require("../models/Bed");
-const Nurse = require("../models/Nurse");
 const Ambulance = require("../models/Ambulance");
 const Slot = require("../models/Slot");
 const mailSender = require("../utils/mailSender");
@@ -289,48 +288,6 @@ exports.add_bed = async (req,res) => {
         return res.status(500).json({
             success : false,
             message : err.message,
-        });
-    }
-}
-
-exports.add_nurse = async (req,res) => {
-    try{
-        const {firstName,lastName,email,phoneno,age,gender,
-            address,DOB,department,qualification,experience} = req.body;
-            if(!firstName || !lastName || !email
-             ||!phoneno || !age
-            || !gender || !address || !DOB  || !department
-            || !qualification || !experience){
-                return res.status(500).json({
-                    success : false,
-                    message : "all fields are required",
-                });
-            }
-        const existingUser = await Nurse.findOne({email});
-        if(existingUser){
-            return res.status(500).json({
-            success : false,
-            message : "you are already registered with us",
-            });
-        }
-
-        const nurse = await Nurse.create({
-            firstName,lastName,email,
-            phoneno,age,gender,
-            address,DOB,department,
-            qualification,experience,
-            image: `https://api.dicebear.com/6.x/initials/svg?seed=${firstName} ${lastName}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=solid,gradientLinear&backgroundRotation=0,360,-350,-340,-330,-320&fontFamily=Arial&fontWeight=600`,
-        });
-        return res.status(200).json({
-			success: true,
-			user:nurse,
-			message: "User registered successfully",
-		});
-    }
-    catch(err){
-        return res.status(500).json({
-            success : false,
-            message : "something went wrong",
         });
     }
 }
@@ -651,7 +608,7 @@ exports.getAdminDashboardStats = async (req, res) => {
       .limit(5);
 
     // 5. Appointment Status Distribution
-    const scheduledCount = await Appointment.countDocuments({ status: "Scheduled" });
+    const scheduledCount = await Appointment.countDocuments({ status: "Confirmed" });
     const cancelledCount = await Appointment.countDocuments({ status: "Cancelled" });
     const completedCount = completedAppointments.length;
 
@@ -1166,7 +1123,7 @@ exports.fixAppointment = async (req, res) => {
             // --- CASE A: CREATE NEW PATIENT ---
             isNewUser = true;
             // Generate Random Password (e.g., Pat8f7d9a)
-            generatedPassword = "Pat" + nodeCrypto.randomBytes(4).toString("hex"); 
+            generatedPassword = "Pass" + nodeCrypto.randomBytes(4).toString("hex"); 
             const hashedPassword = await bcrypt.hash(generatedPassword, 10);
 
             patient = await Patient.create({
@@ -1225,7 +1182,7 @@ exports.fixAppointment = async (req, res) => {
             timeSlot: `${startTime} - ${endTime}`,
             reason,
             symptoms,
-            status: "Scheduled"
+            status: "Confirmed"
         });
 
         // 5. Link Data (Update relations)

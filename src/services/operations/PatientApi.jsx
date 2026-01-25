@@ -3,7 +3,6 @@ import { setLoading, setToken } from "../../Slices/authslice"
 import { setUser } from "../../Slices/profileslice"
 import { profendpoints } from "../api"
 import {apiConnector} from "../apiConnector"
-import {setProgress} from "../../Slices/loadingbarslice"
 
 const {
   PATIENT_EDITPROFILE_API,

@@ -2,24 +2,31 @@ const mongoose = require("mongoose");
 
 const ambulanceSchema = new mongoose.Schema(
     {
+        // =================================================================
+        // VEHICLE IDENTIFICATION
+        // =================================================================
         ambulanceID: {
             type: Number,
-            unique: true
+            unique: true // Custom Auto-Incremented ID (Starts at 101)
         },
         vehicleNumber: {
             type: String,
             required: true,
             trim: true,
-            unique: true
+            unique: true // License plate number must be unique
         },
         model: {
             type: String,
-            required: true,
+            required: true, // e.g., "Tata Winger", "Force Traveler"
         },
         year: {
             type: String,
-            required: true,
+            required: true, // Manufacturing year
         },
+
+        // =================================================================
+        // DRIVER DETAILS
+        // =================================================================
         driverName: {
             type: String,
             required: true,
@@ -30,39 +37,64 @@ const ambulanceSchema = new mongoose.Schema(
         },
         driverLicense: {
             type: String,
-            required: true,
+            required: true, // License number for verification
         },
+
+        // =================================================================
+        // OPERATIONAL STATUS & PRICING
+        // =================================================================
         pricePerHour: {
             type: Number,
             required: true,
             default: 0
         },
-        // Status tracking
         isAvailable: {
             type: Boolean,
-            default: true,
+            default: true, // True = Ready for booking, False = On a trip
         },
-        // Details of the active trip (if active)
+
+        // =================================================================
+        // ACTIVE TRIP TRACKING
+        // =================================================================
+        // Stores details only when the ambulance is currently booked
         currentTrip: {
-            patientId: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", default: null },
-            address: { type: String, default: "" },
-            reason: { type: String, default: "" },
-            startTime: { type: Date, default: null }
+            patientId: { 
+                type: mongoose.Schema.Types.ObjectId, 
+                ref: "Patient", 
+                default: null 
+            },
+            address: { 
+                type: String, 
+                default: "" // Destination/Pickup address
+            },
+            reason: { 
+                type: String, 
+                default: "" // Emergency reason
+            },
+            startTime: { 
+                type: Date, 
+                default: null // Used to calculate duration/cost later
+            }
         }
     },
-    { timestamps: true }
+    { 
+        timestamps: true // Automatically adds 'createdAt' and 'updatedAt'
+    }
 );
 
-// 🚀 AUTO-INCREMENT HOOK for ambulanceID
+// =================================================================
+// PRE-SAVE HOOK: AUTO-INCREMENT AMBULANCE ID
+// =================================================================
 ambulanceSchema.pre("save", async function (next) {
+    // Only run this logic if the document is new
     if (this.isNew) {
         try {
-            const lastAmb = await mongoose.model("Ambulance", ambulanceSchema)
-                .findOne({}, { ambulanceID: 1 })
+            // Find the ambulance with the highest ID
+            const lastAmb = await this.constructor.findOne({}, { ambulanceID: 1 })
                 .sort({ ambulanceID: -1 })
                 .limit(1);
 
-            // Start IDs from 100
+            // If no ambulance exists, start at 101; otherwise increment
             this.ambulanceID = lastAmb && lastAmb.ambulanceID ? lastAmb.ambulanceID + 1 : 101;
             next();
         } catch (error) {

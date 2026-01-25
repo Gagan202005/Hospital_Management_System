@@ -11,8 +11,8 @@ import {
   Phone, Mail, MapPin, Clock, Ambulance, MessageSquare, Send,
   Building, Stethoscope, HeartPulse, Baby, Brain, Loader2
 } from "lucide-react";
-import hospitalReception from "../img/hospital-reception.jpg"; // Ensure path is correct
-
+// import hospitalReception from "../img/hospital-reception.jpg"; // Ensure path is correct
+import hospitalReception from "../img/dep7.jpg";
 // Import API
 import { contactUsApi } from "../services/operations/authApi"; 
 
@@ -119,14 +119,14 @@ const Contact = () => {
       <main className="flex-1 pt-14">
         
         {/* Hero Section */}
-        <section className="relative h-[40vh] min-h-[350px] overflow-hidden flex items-center mt-[142px]">
+        <section className="relative h-[40vh] min-h-[350px] overflow-hidden flex items-center mt-[133px]">
             {/* Background */}
             <div 
                 className="absolute inset-0 bg-cover bg-center"
                 style={{ backgroundImage: `url(${hospitalReception})` }}
             />
             {/* Professional Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-teal-900/90 to-slate-900/95" />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-800/95 via-teal-800/90 to-slate-900/95" />
             
             <div className="relative container mx-auto px-4 z-10">
                 <div className="max-w-2xl text-white">

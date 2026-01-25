@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Plus, Trash2, Clock, Loader2, CalendarRange } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Clock, Loader2, CalendarRange, Lock } from "lucide-react";
 import { Button } from "../../ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../ui/card";
 import { Calendar } from "../../ui/calendar";
@@ -172,9 +172,19 @@ export function TimeSlotManager() {
                             {!slot.isBooked ? "Open" : "Booked"}
                           </Badge>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => handleRemoveSlot(slot.id)} className="text-red-500 hover:bg-red-50 h-8 w-8 p-0">
-                          <Trash2 className="h-4 w-4" />
+                        
+                        {/* --- DELETE BUTTON --- */}
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => handleRemoveSlot(slot.id)} 
+                          disabled={slot.isBooked}
+                          title={slot.isBooked ? "Cannot delete booked slot" : "Delete slot"}
+                          className={`h-8 w-8 p-0 ${slot.isBooked ? "text-slate-300 cursor-not-allowed" : "text-red-500 hover:bg-red-50"}`}
+                        >
+                          {slot.isBooked ? <Lock className="h-4 w-4"/> : <Trash2 className="h-4 w-4" />}
                         </Button>
+
                       </div>
                     ))
                   ) : (
@@ -218,11 +228,24 @@ export function TimeSlotManager() {
                   <AccordionContent className="pt-2 pb-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                       {group.slots.map((slot) => (
-                        <div key={slot.id} className="flex items-center justify-between p-2 pl-3 bg-slate-50 rounded border border-slate-100">
-                          <span className="font-mono text-xs font-semibold text-slate-700">{slot.startTime} - {slot.endTime}</span>
-                          <Button size="icon" variant="ghost" className="h-6 w-6 text-slate-400 hover:text-red-500" onClick={() => handleRemoveSlot(slot.id)}>
-                            <Trash2 className="h-3 w-3" />
+                        <div key={slot.id} className={`flex items-center justify-between p-2 pl-3 rounded border ${slot.isBooked ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className="flex flex-col">
+                              <span className="font-mono text-xs font-semibold text-slate-700">{slot.startTime} - {slot.endTime}</span>
+                              {slot.isBooked && <span className="text-[10px] text-amber-600 font-medium">Booked</span>}
+                          </div>
+                          
+                          {/* --- ACCORDION DELETE BUTTON --- */}
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className={`h-6 w-6 ${slot.isBooked ? "text-slate-300 cursor-not-allowed" : "text-slate-400 hover:text-red-500"}`}
+                            onClick={() => handleRemoveSlot(slot.id)}
+                            disabled={slot.isBooked}
+                            title={slot.isBooked ? "Cannot delete booked slot" : "Delete"}
+                          >
+                             {slot.isBooked ? <Lock className="h-3 w-3"/> : <Trash2 className="h-3 w-3" />}
                           </Button>
+
                         </div>
                       ))}
                     </div>

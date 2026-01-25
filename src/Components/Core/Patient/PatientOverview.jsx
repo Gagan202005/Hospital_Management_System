@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { 
   CalendarCheck, Activity, FileBarChart, Clock, 
-  Search, CalendarPlus, Eye, AlertCircle, FileText 
+  Search, CalendarPlus, Eye, FileText, CheckCircle2, Clock3
 } from "lucide-react";
 import { Button } from "../../ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../ui/card";
@@ -65,6 +65,12 @@ export default function PatientOverview() {
   if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Initializing Medical Dashboard...</div>;
   if (!stats) return <div className="p-12 text-center text-red-500">System temporarily unavailable.</div>;
 
+  // Simplified Last Visit Logic
+  const hasLastVisit = stats.lastVisit && stats.lastVisit !== "N/A";
+  const formattedLastVisit = hasLastVisit 
+    ? new Date(stats.lastVisit).toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' })
+    : "No consultations yet";
+
   return (
     <div className="space-y-8">
       
@@ -94,7 +100,7 @@ export default function PatientOverview() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-slate-800">{stats.upcomingCount}</div>
-            <p className="text-xs text-slate-500 mt-1">Upcoming consultations</p>
+            <p className="text-xs text-slate-500 mt-1">Total Pending & Confirmed</p>
           </CardContent>
         </Card>
 
@@ -131,15 +137,19 @@ export default function PatientOverview() {
           </CardContent>
         </Card>
 
-        {/* Last Interaction */}
+        {/* Last Interaction (SIMPLIFIED) */}
         <Card className="shadow-sm hover:shadow-md transition-shadow border-t-4 border-t-emerald-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">Last Consultation</CardTitle>
             <Clock className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold text-slate-800 truncate">{stats.lastVisit || "N/A"}</div>
-            <p className="text-xs text-slate-500 mt-1">Check-up date</p>
+            <div className="text-lg font-bold text-slate-800 truncate" title={formattedLastVisit}>
+                {formattedLastVisit}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+                {hasLastVisit ? "Date of last check-up" : "Schedule your first visit"}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -157,18 +167,46 @@ export default function PatientOverview() {
                 </CardHeader>
                 <CardContent>
                     {stats.nextAppointment ? (
-                        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 p-6 rounded-xl border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className={`p-6 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
+                            stats.nextAppointment.status === "Confirmed" 
+                            ? "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-100" 
+                            : "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100"
+                        }`}>
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="bg-emerald-200 text-emerald-800 text-[10px] uppercase font-bold px-2 py-1 rounded">Confirmed</span>
-                                    <span className="text-sm text-emerald-900 font-medium">{new Date(stats.nextAppointment.date).toLocaleDateString()}</span>
+                                    {/* DYNAMIC STATUS BADGE */}
+                                    {stats.nextAppointment.status === "Confirmed" ? (
+                                        <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] uppercase font-bold px-2 py-1 rounded flex items-center gap-1">
+                                            <CheckCircle2 className="w-3 h-3"/> Confirmed
+                                        </span>
+                                    ) : (
+                                        <span className="bg-blue-100 text-blue-800 border border-blue-200 text-[10px] uppercase font-bold px-2 py-1 rounded flex items-center gap-1">
+                                            <Clock3 className="w-3 h-3"/> Pending Confirmation
+                                        </span>
+                                    )}
+                                    
+                                    <span className="text-sm font-medium text-slate-600">
+                                        {new Date(stats.nextAppointment.date).toLocaleDateString()}
+                                    </span>
                                 </div>
-                                <h3 className="font-bold text-xl text-emerald-950">Dr. {stats.nextAppointment.doctor?.firstName} {stats.nextAppointment.doctor?.lastName}</h3>
-                                <p className="text-sm text-emerald-700 mt-1">{stats.nextAppointment.doctor?.department || "General Physician"} • {stats.nextAppointment.doctor?.specialization}</p>
+                                
+                                <h3 className="font-bold text-xl text-slate-800">
+                                    Dr. {stats.nextAppointment.doctor?.firstName} {stats.nextAppointment.doctor?.lastName}
+                                </h3>
+                                <p className="text-sm text-slate-600 mt-1">
+                                    {stats.nextAppointment.doctor?.department || "General Physician"} • {stats.nextAppointment.doctor?.specialization}
+                                </p>
                             </div>
+                            
                             <div className="text-right">
-                                <div className="text-3xl font-bold text-emerald-600">{stats.nextAppointment.timeSlot}</div>
-                                <p className="text-xs text-emerald-500 uppercase font-semibold tracking-wider mt-1">Time Slot</p>
+                                <div className={`text-3xl font-bold ${
+                                    stats.nextAppointment.status === "Confirmed" ? "text-emerald-600" : "text-blue-600"
+                                }`}>
+                                    {stats.nextAppointment.timeSlot}
+                                </div>
+                                <p className={`text-xs uppercase font-semibold tracking-wider mt-1 ${
+                                    stats.nextAppointment.status === "Confirmed" ? "text-emerald-500" : "text-blue-500"
+                                }`}>Time Slot</p>
                             </div>
                         </div>
                     ) : (

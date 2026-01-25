@@ -1,188 +1,173 @@
 const Patient = require("../models/Patient");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const OTP = require("../models/OTP")
-const otpGenerator = require("otp-generator");
 const Doctor = require("../models/Doctor");
 const Appointment = require("../models/Appointment");
-const crypto = require("crypto");
-const MedicalRecord = require("../models/Medicalrecord")
+const MedicalRecord = require("../models/Medicalrecord");
+const OTP = require("../models/OTP");
+
+const bcrypt = require("bcrypt");
+const otpGenerator = require("otp-generator");
 require("dotenv").config();
-const {uploadImageToCloudinary} = require("../utils/imageUploader");
-// Signup Controller for Registering USers
 
+
+// =================================================================
+// 1. AUTHENTICATION CONTROLLERS
+// =================================================================
+
+/**
+ * Register a new Patient
+ * Validates inputs, checks OTP, hashes password, and creates user.
+ */
 exports.signup = async (req, res) => {
-	try {
-		// Destructure fields from the request body
-		const {
-			firstName,
-			lastName,
-			email,
-			password,
-			confirmPassword,
-			otp,
-			phone,
+  try {
+    // 1. Destructure fields
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      confirmPassword,
+      otp,
+      phone,
+    } = req.body;
 
-		} = req.body;
-		// Check if All Details are there or not
-		if (
-			!firstName ||
-			!lastName ||
-			!email ||
-			!password ||
-			!confirmPassword ||
-			!otp ||
-			!phone
-		) {
-			return res.status(403).send({
-				success: false,
-				message: "All Fields are required",
-			});
-		}
-		// Check if password and confirm password match
-		if (password !== confirmPassword) {
-			return res.status(400).json({
-				success: false,
-				message:
-					"Password and Confirm Password do not match. Please try again.",
-			});
-		}
+    // 2. Validate Required Fields
+    if (
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password ||
+      !confirmPassword ||
+      !otp ||
+      !phone
+    ) {
+      return res.status(403).send({
+        success: false,
+        message: "All Fields are required",
+      });
+    }
 
-		// Check if user already exists
-		const existingUser = await Patient.findOne({ email });
-		if (existingUser) {
-			return res.status(401).json({
-				success: false,
-				message: "User already exists. Please login in to continue.",
-			});
-		}
+    // 3. Confirm Password Match
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Password and Confirm Password do not match. Please try again.",
+      });
+    }
 
-		// Find the most recent OTP for the email
-		const response = await OTP.find({ email }).sort({ createdAt: -1 }).limit(1);
-		console.log(otp);
-		if (response.length === 0) {
-			// OTP not found for the email
-			return res.status(400).json({
-				success: false,
-				message: "The OTP is not valid",
-			});
-		} else if (otp !== response[0].otp) {
-			// Invalid OTP
-			return res.status(400).json({
-				success: false,
-				message: "The OTP is not valid",
-			});
-		}
+    // 4. Check if User Already Exists
+    const existingUser = await Patient.findOne({ email });
+    if (existingUser) {
+      return res.status(401).json({
+        success: false,
+        message: "User already exists. Please login in to continue.",
+      });
+    }
 
-		// Hash the password
-		const hashedPassword = await bcrypt.hash(password, 10);
+    // 5. Verify OTP
+    // Find the most recent OTP for the email
+    const response = await OTP.find({ email }).sort({ createdAt: -1 }).limit(1);
+    
+    if (response.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "The OTP is not valid",
+      });
+    } else if (otp !== response[0].otp) {
+      return res.status(400).json({
+        success: false,
+        message: "The OTP is not valid",
+      });
+    }
 
-		const user = await Patient.create({
-			firstName,
-			lastName,
-			email,
-			password: hashedPassword,
-			image: `https://api.dicebear.com/6.x/initials/svg?seed=${firstName} ${lastName}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=solid,gradientLinear&backgroundRotation=0,360,-350,-340,-330,-320&fontFamily=Arial&fontWeight=600`,
-			phoneno : phone,
-		});
+    // 6. Hash Password & Create User
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-		return res.status(200).json({
-			success: true,
-			message: "User registered successfully",
-		});
-	} catch (error) {
-		console.error(error);
-		return res.status(500).json({
-			success: false,
-			message: "User cannot be registered. Please try again.",
-		});
-	}
+    const user = await Patient.create({
+      firstName,
+      lastName,
+      email,
+      password: hashedPassword,
+      // Generate a distinct avatar based on name initials
+      image: `https://api.dicebear.com/6.x/initials/svg?seed=${firstName} ${lastName}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=solid,gradientLinear&backgroundRotation=0,360,-350,-340,-330,-320&fontFamily=Arial&fontWeight=600`,
+      phoneno : phone,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User registered successfully",
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "User cannot be registered. Please try again.",
+    });
+  }
 };
 
 
-
-
-
+/**
+ * Send OTP for Email Verification
+ * Generates a 6-digit numeric OTP and saves it to DB (triggering email).
+ */
 exports.sendotp = async (req, res) => {
-	try {
-		const { email } = req.body;
+  try {
+    const { email } = req.body;
 
-		// Check if user is already present
-		// Find user with provided email
-		const user = await Patient.findOne({ email });
-		// to be used in case of signup
+    // 1. Check if user already exists
+    const user = await Patient.findOne({ email });
+    if (user) {
+      return res.status(401).json({
+        success: false,
+        message: `User is Already Registered`,
+      });
+    }
 
-		// If user found with provided email
-		if (user) {
-			// Return 401 Unauthorized status code with error message
-			return res.status(401).json({
-				success: false,
-				message: `User is Already Registered`,
-			});
-		}
+    // 2. Generate Unique OTP
+    var otp = otpGenerator.generate(6, {
+      upperCaseAlphabets: false,
+      lowerCaseAlphabets: false,
+      specialChars: false,
+    });
 
-		var otp = otpGenerator.generate(6, {
-			upperCaseAlphabets: false,
-			lowerCaseAlphabets: false,
-			specialChars: false,
-		});
-		const result = await OTP.findOne({ otp: otp });
-		console.log("Result is Generate OTP Func");
-		console.log("OTP", otp);
-		console.log("Result", result);
-		while (result) {
-			otp = otpGenerator.generate(6, {
-				upperCaseAlphabets: false,
-			});
-			result = await OTP.findOne({ otp: otp });
-		}
-		const otpPayload = { email, otp };
-		const otpBody = await OTP.create(otpPayload);
-		console.log("OTP Body", otpBody);
+    // Ensure OTP is unique in DB (rare collision check)
+    let result = await OTP.findOne({ otp: otp });
+    while (result) {
+      otp = otpGenerator.generate(6, {
+        upperCaseAlphabets: false,
+      });
+      result = await OTP.findOne({ otp: otp });
+    }
 
-		res.status(200).json({
-			success: true,
-			message: `OTP Sent Successfully`,
-			otp,
-		});
-	} catch (error) {
-		console.log(error.message);
-		return res.status(500).json({ success: false, error: error.message });
-	}
+    // 3. Save OTP (Triggers Pre-save Hook for Email)
+    const otpPayload = { email, otp };
+    const otpBody = await OTP.create(otpPayload);
+    console.log("OTP Body", otpBody);
+
+    res.status(200).json({
+      success: true,
+      message: `OTP Sent Successfully`,
+      otp,
+    });
+
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({ success: false, error: error.message });
+  }
 };
 
 
-exports.getallreports = async (req,res) => {
-    try{
-        const {patientID} = req.user._id;
-        if(!patientID){
-            return res.status(500).json({
-                success:false,
-                message:"patient id is missing",
-            });
-        }
-        const reports = await MedicalRecord.find({patient:patientID}).populate("doctor");
-        return res.status(200).json({
-            success:true,
-            message:"data fetched successfully",
-            reports,
-        });
-    }
-    catch(error) {
-        console.error(error);
-        return res.status(500).json({
-            success:false,
-            message:error.message,
-        });
-    }
-}
+// =================================================================
+// 2. PROFILE MANAGEMENT CONTROLLERS
+// =================================================================
 
-// =============================================
-// EDIT PROFILE (TEXT DATA)
-// =============================================
+/**
+ * Edit Patient Profile Details
+ * Updates personal info, contact, and address.
+ */
 exports.editprofile = async (req, res) => {
     try {
-        // 1. Destructure data
         const { 
             firstName, 
             lastName, 
@@ -198,7 +183,6 @@ exports.editprofile = async (req, res) => {
 
         const id = req.user.id; // From auth middleware
 
-        // 2. Find Patient
         const patient = await Patient.findById(id);
         if (!patient) {
             return res.status(404).json({
@@ -207,14 +191,13 @@ exports.editprofile = async (req, res) => {
             });
         }
 
-        // 3. Update Fields
-        // We update conditionally to avoid overwriting with undefined if something is missing
+        // Update fields if provided
         if (firstName) patient.firstName = firstName;
         if (lastName) patient.lastName = lastName;
         if (email) patient.email = email;
         if (phoneno) patient.phoneno = phoneno;
         
-        // These fields might be sent as null/empty strings intentionally to clear them
+        // These fields can be updated or cleared
         patient.DOB = DOB; 
         patient.gender = gender;
         patient.address = address;
@@ -222,7 +205,6 @@ exports.editprofile = async (req, res) => {
         patient.emergencyContactName = emergencyContactName;
         patient.emergencyContactPhone = emergencyContactPhone;
 
-        // 4. Save
         await patient.save();
 
         return res.status(200).json({
@@ -242,15 +224,57 @@ exports.editprofile = async (req, res) => {
 };
 
 
+// =================================================================
+// 3. MEDICAL & CLINICAL CONTROLLERS
+// =================================================================
 
+/**
+ * Get All Medical Reports
+ * Fetches medical history for the logged-in patient.
+ */
+exports.getallreports = async (req,res) => {
+    try{
+        // Fix: Use req.user.id directly, not destructuring property
+        const patientID = req.user.id; 
+
+        if(!patientID){
+            return res.status(500).json({
+                success:false,
+                message:"Patient ID is missing",
+            });
+        }
+        
+        const reports = await MedicalRecord.find({patient: patientID})
+            .populate("doctor")
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success:true,
+            message:"Reports fetched successfully",
+            reports,
+        });
+    }
+    catch(error) {
+        console.error(error);
+        return res.status(500).json({
+            success:false,
+            message:error.message,
+        });
+    }
+}
+
+
+/**
+ * Get Patient Appointments
+ * Fetches list of all appointments for the user.
+ */
 exports.getPatientAppointments = async (req, res) => {
   try {
-    const patientId = req.user.id; // From Auth Middleware
+    const patientId = req.user.id;
 
-    // Fetch appointments and populate Doctor details
     const appointments = await Appointment.find({ patient: patientId })
-      .populate("doctor", "firstName lastName image email") // Get Doctor info
-      .sort({ date: 1 }); // Sort by date ascending
+      .populate("doctor", "firstName lastName image email")
+      .sort({ date: 1 }); // Ascending order (Upcoming first)
 
     return res.status(200).json({
       success: true,
@@ -265,58 +289,59 @@ exports.getPatientAppointments = async (req, res) => {
   }
 };
 
+
+// =================================================================
+// 4. DASHBOARD CONTROLLERS
+// =================================================================
+
+/**
+ * Get Patient Dashboard Statistics
+ * Aggregates data for the dashboard view (Upcoming appts, vitals, last visit).
+ */
 exports.getPatientDashboardStats = async (req, res) => {
   try {
     const patientId = req.user.id;
 
-    // 1. Patient Details
+    // 1. Get Basic Info
     const patient = await Patient.findById(patientId).select("firstName lastName");
 
-    // 2. Counts
+    // 2. Count Upcoming Appointments
     const upcomingCount = await Appointment.countDocuments({
       patient: patientId,
-      status: { $in: ["Scheduled", "Confirmed"] },
+      status: { $in: ["Pending","Confirmed"] },
       date: { $gte: new Date() }
     });
 
-    // 3. Last Visit (Completed Appointment)
+    // 3. Find Last Completed Visit
     const lastAppointment = await Appointment.findOne({
       patient: patientId,
       status: "Completed"
     }).sort({ date: -1 });
 
-    // 4. Next Upcoming Appointment (Specific details)
+    // 4. Find Next Scheduled Appointment
     const nextAppointment = await Appointment.findOne({
       patient: patientId,
-      status: { $in: ["Scheduled", "Confirmed"] },
+      status: { $in: ["Pending","Confirmed"] },
       date: { $gte: new Date() }
     })
     .sort({ date: 1 })
     .populate("doctor", "firstName lastName");
 
-    // 5. Latest Medical Records (Limit 3)
+    // 5. Fetch Recent Medical Records (Limit 3)
     const recentReports = await MedicalRecord.find({ patient: patientId })
       .sort({ createdAt: -1 })
       .limit(3)
       .populate("doctor", "firstName lastName");
 
-    // 6. Latest Vitals (from the most recent report)
+    // 6. Extract Latest Vitals
     const latestVitals = recentReports.length > 0 ? recentReports[0].vitalSigns : null;
-
-    // Calculate "Days Ago" for last visit
-    let daysAgo = "Never";
-    if (lastAppointment) {
-        const diffTime = Math.abs(new Date() - new Date(lastAppointment.date));
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-        daysAgo = `${diffDays} days ago`;
-    }
 
     return res.status(200).json({
       success: true,
       data: {
         patientName: `${patient.firstName} ${patient.lastName}`,
         upcomingCount,
-        lastVisit: daysAgo,
+        lastVisit: lastAppointment ? lastAppointment.date : null,
         nextAppointment,
         latestVitals,
         recentReports
