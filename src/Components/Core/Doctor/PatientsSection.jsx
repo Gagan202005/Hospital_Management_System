@@ -12,6 +12,7 @@ import { Button } from "../../ui/button";
 import { Separator } from "../../ui/separator";
 import { useSelector } from "react-redux";
 import { fetchDoctorPatients } from "../../../services/operations/DoctorApi";
+import { useToast } from "../../../hooks/use-toast";
 
 export function PatientsSection() {
   const { token } = useSelector((state) => state.auth);
@@ -19,6 +20,7 @@ export function PatientsSection() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const { toast } = useToast();
 
   // --- Data Fetching ---
   useEffect(() => {
@@ -29,13 +31,15 @@ export function PatientsSection() {
             const data = await fetchDoctorPatients(token);
             if (data) setPatients(data);
         } catch (error) {
-            console.error("Failed to load patients", error);
+            console.error("FETCH PATIENTS ERROR:", error);
+            const errorMessage = error.response?.data?.message || error.message || "Failed to load patients";
+            toast({ title: "Error", description: errorMessage, variant: "destructive" });
         }
       }
       setLoading(false);
     };
     loadData();
-  }, [token]);
+  }, [token, toast]);
 
   // --- Filtering ---
   const filteredPatients = patients.filter(patient =>

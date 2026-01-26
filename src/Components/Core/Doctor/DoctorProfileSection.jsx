@@ -90,9 +90,16 @@ export function DoctorProfileSection() {
     }
     
     setIsLoading(true);
-    await updateDoctorProfile(editedProfile, token, dispatch);
-    setIsEditing(false);
-    setIsLoading(false);
+    try {
+        await updateDoctorProfile(editedProfile, token, dispatch);
+        toast({ title: "Success", description: "Profile updated successfully." });
+        setIsEditing(false);
+    } catch (error) {
+        const errorMessage = error.response?.data?.message || error.message || "Failed to update profile";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleFileChange = async (e) => {
@@ -102,13 +109,21 @@ export function DoctorProfileSection() {
         toast({ title: "File too large", description: "Max size is 5MB.", variant: "destructive" });
         return;
       }
-      // Optimistic update for UI
-      const objectUrl = URL.createObjectURL(file);
-      setProfile(prev => ({ ...prev, image: objectUrl })); 
-      setEditedProfile(prev => ({ ...prev, image: objectUrl }));
       
-      // Upload
-      await updateDoctorPfp(token, file, dispatch, toast);
+      try {
+          // Optimistic update for UI
+          const objectUrl = URL.createObjectURL(file);
+          setProfile(prev => ({ ...prev, image: objectUrl })); 
+          setEditedProfile(prev => ({ ...prev, image: objectUrl }));
+          
+          // Upload
+          await updateDoctorPfp(token, file, dispatch);
+          toast({ title: "Success", description: "Profile picture updated." });
+          
+      } catch (error) {
+          const errorMessage = error.response?.data?.message || error.message || "Failed to upload image";
+          toast({ title: "Upload Failed", description: errorMessage, variant: "destructive" });
+      }
     }
   };
 
@@ -123,6 +138,7 @@ export function DoctorProfileSection() {
 
   // --- 4. Password Handlers ---
   const handlePassChange = (e) => setPassData({...passData, [e.target.name]: e.target.value});
+  
   const submitPassword = async () => {
       if(passData.newPassword !== passData.confirmPassword) {
           toast({ title: "Mismatch", description: "New passwords do not match.", variant: "destructive" });
@@ -133,10 +149,16 @@ export function DoctorProfileSection() {
           return;
       }
       
-      const success = await changePassword(token, passData);
-      if(success) {
-          setIsPasswordModalOpen(false);
-          setPassData({ oldPassword: "", newPassword: "", confirmPassword: "" });
+      try {
+          const success = await changePassword(token, passData);
+          if(success) {
+              setIsPasswordModalOpen(false);
+              setPassData({ oldPassword: "", newPassword: "", confirmPassword: "" });
+              toast({ title: "Success", description: "Password changed successfully." });
+          }
+      } catch (error) {
+          const errorMessage = error.response?.data?.message || error.message || "Failed to change password";
+          toast({ title: "Error", description: errorMessage, variant: "destructive" });
       }
   };
 

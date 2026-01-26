@@ -89,7 +89,7 @@ const DoctorProfile = () => {
                         </div>
                         
                         <div className="flex flex-wrap gap-6 text-sm text-slate-600">
-                            <div className="flex items-center gap-2"><Clock className="w-4 h-4 text-blue-600"/> <span>{doctor.experience} Years of Experience</span></div>
+                            <div className="flex items-center gap-2"><Clock className="w-4 h-4 text-blue-600"/> <span>{doctor.experience} of Experience</span></div>
                             <div className="flex items-center gap-2"><IndianRupee className="w-4 h-4 text-green-600"/> <span className="font-semibold">{doctor.consultationFee} Consultation Fee</span></div>
                         </div>
 

@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Textarea } from "../../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
-import { CalendarRange, Clock, User, Stethoscope, Loader2, CheckCircle, Info } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
+import { CalendarRange, User, Stethoscope, Loader2, CheckCircle, Info } from "lucide-react";
+import { useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
 import { getAllUsers, fixAppointment } from "../../../services/operations/AdminApi";
 
@@ -22,8 +22,13 @@ export const FixAppointment = () => {
 
   useEffect(() => {
     const loadDocs = async () => {
-      const docs = await getAllUsers(token, "doctor");
-      if (Array.isArray(docs)) setDoctors(docs);
+      try {
+        const docs = await getAllUsers(token, "doctor");
+        if (Array.isArray(docs)) setDoctors(docs);
+      } catch (error) {
+        console.error("FETCH DOCTORS ERROR:", error);
+        // Optional: toast.error("Failed to load doctor list");
+      }
     };
     loadDocs();
   }, [token]);
@@ -34,18 +39,35 @@ export const FixAppointment = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+
+    // Validation
     if (formData.startTime >= formData.endTime) {
         toast.error("End time must be after start time");
         setIsLoading(false);
         return;
     }
-    const response = await fixAppointment(formData, token);
-    if (response?.success) {
-        setFormData({ doctorId: "", date: "", startTime: "", endTime: "", firstName: "", lastName: "", email: "", phone: "", reason: "", symptoms: "" });
-        if (response.newPatientCreated) toast.success(`New Patient Account Created! Password: ${response.generatedPassword}`, { duration: 8000 });
-        else toast.success("Appointment Scheduled Successfully");
+
+    try {
+        const response = await fixAppointment(formData, token);
+        
+        // Success Handling
+        if (response?.success) {
+            setFormData({ doctorId: "", date: "", startTime: "", endTime: "", firstName: "", lastName: "", email: "", phone: "", reason: "", symptoms: "" });
+            
+            if (response.newPatientCreated) {
+                toast.success(`New Patient Account Created! Password: ${response.generatedPassword}`, { duration: 8000 });
+            } else {
+                toast.success("Appointment Scheduled Successfully");
+            }
+        }
+    } catch (error) {
+        console.error("BOOKING ERROR:", error);
+        // >>> UPDATED: Show Backend Error Message <<<
+        const errorMessage = error.response?.data?.message || error.message || "Failed to book appointment.";
+        toast.error(errorMessage);
+    } finally {
+        setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (

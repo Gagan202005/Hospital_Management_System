@@ -3,7 +3,7 @@ const router = express.Router();
 
 // Middleware Imports
 const { auth, isDoctor } = require("../middlewares/auth");
-
+const {isDemo} = require("../middlewares/isDemo");
 // Controller Imports
 const { getalluserdetails } = require("../controllers/Login");
 const { updateDisplayPicture } = require("../controllers/Common");
@@ -31,10 +31,10 @@ const {
 router.get("/getDoctorDetails", auth, isDoctor, getalluserdetails);
 
 // Update profile details
-router.put("/editprofile", auth, isDoctor, updateDoctorProfile);
+router.put("/editprofile", auth,isDemo, isDoctor, updateDoctorProfile);
 
 // Update profile picture (Protected by Demo Check)
-router.put("/updateDisplayPicture", auth, isDoctor, updateDisplayPicture);
+router.put("/updateDisplayPicture", auth,isDemo, isDoctor, updateDisplayPicture);
 
 // Get Dashboard Statistics (KPIs, Charts, Recent Activity)
 router.get("/dashboard-stats", auth, isDoctor, getDoctorDashboardStats);
@@ -65,7 +65,7 @@ router.get("/patients", auth, isDoctor, getDoctorPatients);
 router.get("/appointments", auth, isDoctor, getDoctorAppointments);
 
 // Update appointment status (e.g., Pending -> Confirmed/Completed)
-router.post("/update-status", auth, isDoctor, updateAppointmentStatus);
+router.post("/update-status", auth,isDemo, isDoctor, updateAppointmentStatus);
 
 
 // ==========================================================================

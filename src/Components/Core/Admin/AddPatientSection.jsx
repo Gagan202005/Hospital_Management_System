@@ -38,8 +38,14 @@ export const AddPatientSection = () => {
     try {
       const result = await getAllUsers(token, "patient");
       if (result) setPatients(result);
-    } catch (error) { console.error(error); } 
-    finally { setIsFetching(false); }
+    } catch (error) { 
+        console.error("FETCH ERROR:", error);
+        // Display backend error even for fetching list
+        const errorMessage = error.response?.data?.message || error.message || "Failed to load patient list.";
+        toast.error(errorMessage);
+    } finally { 
+        setIsFetching(false); 
+    }
   };
 
   useEffect(() => { fetchPatients(); }, [token]);
@@ -77,10 +83,15 @@ export const AddPatientSection = () => {
     setIsLoading(true);
     try {
       if (isEditing) {
-        await Update_Patient({ ...formData, _id: editId }, token);
-        toast.success("Patient record updated.");
+        // --- UPDATE OPERATION ---
+        const response = await Update_Patient({ ...formData, _id: editId }, token);
+        // You can also use response.message here if your API returns it on success
+        toast.success(response?.message || "Patient record updated successfully.");
       } else {
+        // --- ADD OPERATION ---
         const response = await Add_Patient(formData, token);
+        
+        // Show Special Toast for Password
         if(response?.generatedPassword) {
            toast.success((t) => (
                <div className="flex flex-col gap-1">
@@ -92,12 +103,20 @@ export const AddPatientSection = () => {
                  <span className="text-[10px] opacity-80">Credentials sent to email.</span>
                </div>
              ), { duration: 8000 });
+        } else {
+            toast.success(response?.message || "Patient registered successfully.");
         }
       }
       fetchPatients(); 
       resetForm();
-    } catch (error) { console.error(error); } 
-    finally { setIsLoading(false); }
+    } catch (error) { 
+        console.error("SUBMIT ERROR:", error);
+        // >>> UPDATED LOGIC TO ALWAYS SHOW BACKEND MESSAGE <<<
+        const errorMessage = error.response?.data?.message || error.message || "Operation failed.";
+        toast.error(errorMessage);
+    } finally { 
+        setIsLoading(false); 
+    }
   };
 
   const handleEditClick = (patient) => {
@@ -116,8 +135,16 @@ export const AddPatientSection = () => {
 
   const handleDeleteClick = async (id) => {
     if (window.confirm("Confirm deletion? This action is irreversible.")) {
-      await Delete_Patient(id, token);
-      fetchPatients();
+      try {
+          const response = await Delete_Patient(id, token);
+          toast.success(response?.message || "Patient record deleted successfully.");
+          fetchPatients();
+      } catch (error) {
+          console.error("DELETE ERROR:", error);
+          // >>> UPDATED LOGIC TO ALWAYS SHOW BACKEND MESSAGE <<<
+          const errorMessage = error.response?.data?.message || error.message || "Failed to delete patient.";
+          toast.error(errorMessage);
+      }
     }
   };
 

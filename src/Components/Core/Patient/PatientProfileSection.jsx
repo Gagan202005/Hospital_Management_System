@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { 
   User, Edit, Save, X, Camera, MapPin, Phone, Mail, 
-  Droplet, HeartPulse, UserCog, Lock, KeyRound 
+  Droplet, HeartPulse, UserCog, Lock, KeyRound, Loader2 
 } from "lucide-react";
 import { Button } from "../../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
@@ -12,12 +12,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { Badge } from "../../ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../ui/dialog";
-import { useToast } from "../../../hooks/use-toast"; // Or react-hot-toast depending on your setup
+import { useToast } from "../../../hooks/use-toast"; 
 import { useDispatch, useSelector } from "react-redux";
 
 // API Imports
 import { UpdatePfp, updateprofile } from "../../../services/operations/PatientApi";
-import { changePassword } from "../../../services/operations/authApi"; // Unified Auth API
+import { changePassword } from "../../../services/operations/authApi"; 
 
 export default function PatientProfileSection() {
   const dispatch = useDispatch();
@@ -28,11 +28,12 @@ export default function PatientProfileSection() {
   // --- UI States ---
   const [isEditing, setIsEditing] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef(null);
   
   // --- Data States ---
   const [pfpFile, setPfpFile] = useState(null); 
-  const [previewUrl, setPreviewUrl] = useState(user.image); 
+  const [previewUrl, setPreviewUrl] = useState(user?.image); 
 
   // Profile Form Data
   const [profile, setProfile] = useState(initializeProfile(user));
@@ -41,14 +42,17 @@ export default function PatientProfileSection() {
 
   // --- 1. Sync State with Redux ---
   useEffect(() => {
-    setPreviewUrl(user.image);
-    setPfpFile(null); 
-    const newData = initializeProfile(user);
-    setProfile(newData);
-    setEditedProfile(newData);
+    if (user) {
+        setPreviewUrl(user.image);
+        setPfpFile(null); 
+        const newData = initializeProfile(user);
+        setProfile(newData);
+        setEditedProfile(newData);
+    }
   }, [user]);
 
   function initializeProfile(userData) {
+    if (!userData) return {};
     return {
       firstName: userData.firstName || "",
       lastName: userData.lastName || "",
@@ -66,7 +70,7 @@ export default function PatientProfileSection() {
   // --- 2. Action Handlers: Profile ---
   const handleEditToggle = () => {
     if (isEditing) {
-      setEditedProfile(profile);
+      setEditedProfile(profile); // Revert changes
       setPreviewUrl(user.image);
       setPfpFile(null);
     }
@@ -95,12 +99,25 @@ export default function PatientProfileSection() {
         toast({ title: "Validation Error", description: "Name and Phone are required", variant: "destructive" });
         return;
     }
+    
+    setIsLoading(true);
     try {
-        if (pfpFile) await UpdatePfp(token, pfpFile, user.accountType, dispatch);
+        // Upload Picture if changed
+        if (pfpFile) {
+            await UpdatePfp(token, pfpFile, user.accountType, dispatch);
+        }
+        
+        // Update Details
         await updateprofile(editedProfile, token, dispatch);
+        
+        toast({ title: "Success", description: "Profile updated successfully." });
         setIsEditing(false);
     } catch (error) {
         console.error(error);
+        const errorMessage = error.response?.data?.message || error.message || "Failed to update profile";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -119,12 +136,20 @@ export default function PatientProfileSection() {
         return;
     }
 
-    const success = await changePassword(token, passwordData);
-    if (success) {
-        setIsPasswordModalOpen(false);
-        setPasswordData({ oldPassword: "", newPassword: "", confirmPassword: "" });
+    try {
+        const success = await changePassword(token, passwordData);
+        if (success) {
+            setIsPasswordModalOpen(false);
+            setPasswordData({ oldPassword: "", newPassword: "", confirmPassword: "" });
+            toast({ title: "Success", description: "Password changed successfully." });
+        }
+    } catch (error) {
+        const errorMessage = error.response?.data?.message || error.message || "Failed to change password";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
   };
+
+  if (!user) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-slate-400"/></div>;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -138,8 +163,11 @@ export default function PatientProfileSection() {
         <div className="flex gap-2">
           {isEditing ? (
             <>
-              <Button variant="outline" onClick={handleEditToggle}><X className="h-4 w-4 mr-2" /> Cancel</Button>
-              <Button onClick={handleSaveProfile} className="bg-emerald-600 hover:bg-emerald-700"><Save className="h-4 w-4 mr-2" /> Save Changes</Button>
+              <Button variant="outline" onClick={handleEditToggle} disabled={isLoading}><X className="h-4 w-4 mr-2" /> Cancel</Button>
+              <Button onClick={handleSaveProfile} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
+                {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <Save className="h-4 w-4 mr-2" />} 
+                Save Changes
+              </Button>
             </>
           ) : (
             <Button onClick={handleEditToggle} variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50">

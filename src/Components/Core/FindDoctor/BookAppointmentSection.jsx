@@ -58,28 +58,47 @@ const BookAppointment = () => {
   // --- 1. Load Doctor ---
   useEffect(() => {
     const loadDoctor = async () => {
-      const data = await fetchDoctorDetails(id);
-      if (data) setDoctor(data);
+      try {
+        const data = await fetchDoctorDetails(id);
+        if (data) setDoctor(data);
+      } catch (error) {
+        console.error("FETCH DOCTOR ERROR:", error);
+        const errorMessage = error.response?.data?.message || "Failed to load doctor details.";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+      }
     };
     if (id) loadDoctor();
-  }, [id]);
+  }, [id, toast]);
 
   // --- 2. Load Slots ---
   useEffect(() => {
     const loadSlots = async () => {
       if (!selectedDate || !id) return;
-      setLoadingSlots(true); setSelectedSlotId(""); setDisplayTime("");
+      
+      setLoadingSlots(true); 
+      setSelectedSlotId(""); 
+      setDisplayTime("");
+      setAvailableSlots([]);
+
       try {
         const slots = await fetchTimeSlotsbyDate(id, format(selectedDate, "yyyy-MM-dd"));
         setAvailableSlots(slots || []);
-      } catch (error) { console.error(error); } 
-      finally { setLoadingSlots(false); }
+      } catch (error) { 
+        console.error("FETCH SLOTS ERROR:", error);
+        const errorMessage = error.response?.data?.message || "Failed to load time slots.";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+      } finally { 
+        setLoadingSlots(false); 
+      }
     };
     loadSlots();
-  }, [selectedDate, id]);
+  }, [selectedDate, id, toast]);
 
   const handleBook = async () => {
-    if (!token) { toast.error("Please login first"); return navigate("/login"); }
+    if (!token) { 
+        toast({ title: "Authentication Required", description: "Please login to continue.", variant: "destructive" }); 
+        return navigate("/login"); 
+    }
     
     if (!isFormValid) { 
         return toast({
@@ -90,9 +109,21 @@ const BookAppointment = () => {
     }
 
     setIsBooking(true);
-    const payload = { doctorId: id, date: format(selectedDate, "yyyy-MM-dd"), timeSlotId: selectedSlotId, ...formData };
-    await bookAppointmentApi(payload, token, navigate);
-    setIsBooking(false);
+    try {
+        const payload = { 
+            doctorId: id, 
+            date: format(selectedDate, "yyyy-MM-dd"), 
+            timeSlotId: selectedSlotId, 
+            ...formData 
+        };
+        await bookAppointmentApi(payload, token, navigate);
+    } catch (error) {
+        console.error("BOOKING ERROR:", error);
+        const errorMessage = error.response?.data?.message || "Booking failed. Please try again.";
+        toast({ title: "Booking Failed", description: errorMessage, variant: "destructive" });
+    } finally {
+        setIsBooking(false);
+    }
   };
 
   // --- Guest View ---
@@ -167,10 +198,27 @@ const BookAppointment = () => {
                             </div>
                             <div className="space-y-2">
                                 <Label>Time Slot <span className="text-red-500">*</span></Label>
-                                <Select value={selectedSlotId} onValueChange={(val) => {setSelectedSlotId(val); setDisplayTime(availableSlots.find(s=>s._id===val)?.startTime);}} disabled={!selectedDate || loadingSlots}>
+                                <Select 
+                                    value={selectedSlotId} 
+                                    onValueChange={(val) => {
+                                        setSelectedSlotId(val); 
+                                        // UPDATED: Find full slot details to show start and end time
+                                        const slot = availableSlots.find(s => s._id === val);
+                                        if (slot) setDisplayTime(`${slot.startTime} - ${slot.endTime}`);
+                                    }} 
+                                    disabled={!selectedDate || loadingSlots}
+                                >
                                     <SelectTrigger><SelectValue placeholder={loadingSlots ? "Loading..." : "Select Time"} /></SelectTrigger>
                                     <SelectContent>
-                                        {availableSlots.length > 0 ? availableSlots.map(s => <SelectItem key={s._id} value={s._id}>{s.startTime}</SelectItem>) : <SelectItem disabled>No slots available</SelectItem>}
+                                        {availableSlots.length > 0 ? (
+                                            availableSlots.map(s => (
+                                                <SelectItem key={s._id} value={s._id}>
+                                                    {s.startTime} - {s.endTime}
+                                                </SelectItem>
+                                            ))
+                                        ) : (
+                                            <SelectItem disabled>No slots available</SelectItem>
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>

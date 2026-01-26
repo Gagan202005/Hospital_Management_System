@@ -23,7 +23,11 @@ export default function DoctorOverview() {
             const data = await fetchDashboardStats(token);
             if (data) setStats(data);
         } catch (error) {
-            console.error("Stats Error", error);
+            console.error("DASHBOARD STATS ERROR:", error);
+            // Since this is just loading initial data, we usually don't toast an error here 
+            // unless critical, but we log the specific backend message.
+            const message = error.response?.data?.message || error.message;
+            console.log("Error Details:", message);
         }
       }
       setLoading(false);

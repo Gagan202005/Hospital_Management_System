@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../ui/dialo
 import { ScrollArea } from "../../ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { toast } from "react-hot-toast";
 
 // Reuse the Report Viewer Component Logic
 import { ViewReportContent } from "./PatientAppointmentSection"; 
@@ -37,7 +38,11 @@ export default function PatientOverview() {
             const data = await fetchPatientDashboardStats(token);
             if (data) setStats(data);
         } catch (error) {
-            console.error("Dashboard Load Error", error);
+            console.error("DASHBOARD LOAD ERROR:", error);
+            // Log for debugging, usually don't toast on initial dashboard load unless critical
+            // but here is how we would handle it:
+            const errorMessage = error.response?.data?.message || error.message || "Failed to load dashboard";
+            console.log(errorMessage); 
         }
       }
       setLoading(false);
@@ -47,10 +52,18 @@ export default function PatientOverview() {
 
   // --- Helper: Fetch Full Report Details ---
   const handleViewReport = async (reportId) => {
-    const data = await fetchVisitReport(token, reportId);
-    if (data) {
-      setSelectedReport(data);
-      setIsReportOpen(true);
+    try {
+        const data = await fetchVisitReport(token, reportId);
+        if (data) {
+          setSelectedReport(data);
+          setIsReportOpen(true);
+        } else {
+          toast.error("Report details unavailable.");
+        }
+    } catch (error) {
+        console.error("REPORT FETCH ERROR:", error);
+        const errorMessage = error.response?.data?.message || error.message || "Failed to load report";
+        toast.error(errorMessage);
     }
   };
 

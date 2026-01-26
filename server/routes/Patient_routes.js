@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Middleware Imports
 const { auth, isPatient } = require("../middlewares/auth");
+const {isDemo} = require("../middlewares/isDemo");
 
 // Controller Imports
 const { getalluserdetails } = require("../controllers/Login");
@@ -23,10 +24,10 @@ const {
 router.get("/getPatientDetails", auth, isPatient, getalluserdetails);
 
 // Update profile information
-router.post("/editprofile", auth, isPatient, editprofile);
+router.post("/editprofile", auth,isDemo, isPatient, editprofile);
 
 // Update profile picture
-router.post("/updateDisplayPicture", auth, isPatient, updateDisplayPicture);
+router.post("/updateDisplayPicture", auth,isDemo, isPatient, updateDisplayPicture);
 
 
 // ==========================================================================

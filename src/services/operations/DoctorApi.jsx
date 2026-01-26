@@ -1,7 +1,6 @@
 import { apiConnector } from "../apiConnector";
-import { toast } from "react-hot-toast";
 import { Doctorendpoints } from "../api";
-import { setUser } from "../../Slices/profileslice"; // Adjust path to your slice
+import { setUser } from "../../Slices/profileslice"; 
 
 const {
   UPDATE_DOCTOR_PROFILE_API, 
@@ -21,7 +20,6 @@ const {
 
 // --- FETCH SLOTS ---
 export const fetchTimeSlots = async (token) => {
-  let result = [];
   try {
     const response = await apiConnector(
       "GET", 
@@ -34,19 +32,16 @@ export const fetchTimeSlots = async (token) => {
       throw new Error(response?.data?.message || "Could not fetch slots");
     }
     
-    result = response.data;
+    return response.data;
 
   } catch (error) {
     console.log("FETCH_SLOTS_ERROR:", error);
-    toast.error("Could not load time slots.");
+    throw error;
   }
-  return result;
 };
 
 // --- CREATE SLOT ---
 export const createTimeSlot = async (date, startTime, endTime, token) => {
-  let result = null;
-  
   try {
     // FIX: Manually construct YYYY-MM-DD from local time
     const year = date.getFullYear();
@@ -72,19 +67,16 @@ export const createTimeSlot = async (date, startTime, endTime, token) => {
       throw new Error(response?.data?.message || "Failed to create slot");
     }
 
-    result = response.data;
-    toast.success("Time slot added successfully.");
+    return response.data;
 
   } catch (error) {
     console.log("CREATE_SLOT_ERROR:", error);
-    toast.error(error.response?.data?.message || "Failed to add slot.");
+    throw error;
   }
-  return result;
 };
 
 // --- DELETE SLOT ---
 export const deleteTimeSlot = async (slotId, token) => {
-  let success = false;
   try {
     const response = await apiConnector(
       "DELETE", DELETE_TIME_SLOT_API,
@@ -96,18 +88,15 @@ export const deleteTimeSlot = async (slotId, token) => {
       throw new Error(response?.data?.message || "Failed to delete slot");
     }
 
-    success = true;
-    toast.success("Time slot removed.");
+    return true;
   } catch (error) {
     console.log("DELETE_SLOT_ERROR:", error);
-    toast.error(error.response?.data?.message || "Could not delete time slot.");
+    throw error;
   }
-  return success;
 };
 
 // --- UPDATE PROFILE ---
 export async function updateDoctorProfile(data, token, dispatch) {
-  const toastId = toast.loading("Updating Profile...");
   try {
     const response = await apiConnector(
       "PUT",
@@ -137,26 +126,23 @@ export async function updateDoctorProfile(data, token, dispatch) {
       throw new Error(response.data.message);
     }
 
-    toast.success("Profile Updated Successfully");
-
     // Update Redux State 
     const currentUser = JSON.parse(localStorage.getItem("user"));
     const updatedUser = { ...currentUser, ...response.data.data };
     
     localStorage.setItem("user", JSON.stringify(updatedUser));
     dispatch(setUser(updatedUser));
+    
+    return response.data;
 
   } catch (error) {
     console.log("UPDATE_DOCTOR_PROFILE API ERROR............", error);
-    toast.error(error?.response?.data?.message || "Could not update profile");
+    throw error;
   }
-  toast.dismiss(toastId);
 }
 
 // --- UPDATE PROFILE PICTURE ---
 export async function updateDoctorPfp(token, pfp, dispatch) {
-  // Removed 'toast' from params as we import it directly
-  const toastId = toast.loading("Uploading image...");
   try {
     const formData = new FormData();
     formData.append('pfp', pfp);
@@ -175,24 +161,21 @@ export async function updateDoctorPfp(token, pfp, dispatch) {
       throw new Error(response.data.message);
     }
 
-    toast.success("Profile picture updated.");
-    
     const imageUrl = response.data.data.image; 
     const user = JSON.parse(localStorage.getItem("user"));
     const updatedUser = { ...user, image: imageUrl };
     localStorage.setItem("user", JSON.stringify(updatedUser));
     dispatch(setUser(updatedUser));
+    
+    return response.data;
 
   } catch (error) {
     console.log("UPDATE_PFP_API ERROR:", error);
-    toast.error(error?.response?.data?.message || "Could not upload image.");
-  } finally {
-    toast.dismiss(toastId);
+    throw error;
   }
 }
 
 export const fetchPublicDoctors = async (searchQuery = "", specialty = "") => {
-  let result = [];
   try {
     const params = {};
     if (searchQuery) params.searchQuery = searchQuery;
@@ -210,15 +193,14 @@ export const fetchPublicDoctors = async (searchQuery = "", specialty = "") => {
       throw new Error(response?.data?.message || "Could not fetch doctors");
     }
 
-    result = response.data.data;
+    return response.data.data;
   } catch (error) {
     console.log("FETCH_PUBLIC_DOCTORS_ERROR:", error);
+    throw error;
   }
-  return result;
 };
 
 export const fetchDoctorDetails = async (doctorId) => {
-  let result = null;
   try {
     const response = await apiConnector(
       "GET",
@@ -231,15 +213,14 @@ export const fetchDoctorDetails = async (doctorId) => {
       throw new Error(response?.data?.message || "Could not fetch doctor details");
     }
 
-    result = response.data.data;
+    return response.data.data;
   } catch (error) {
     console.log("FETCH_DOCTOR_DETAILS_ERROR:", error);
+    throw error;
   }
-  return result;
 };
 
 export const fetchDoctorPatients = async (token) => {
-  let result = [];
   try {
     const response = await apiConnector(
       "GET",
@@ -252,11 +233,11 @@ export const fetchDoctorPatients = async (token) => {
       throw new Error(response?.data?.message);
     }
 
-    result = response.data.data;
+    return response.data.data;
   } catch (error) {
     console.log("FETCH_PATIENTS_ERROR:", error);
+    throw error;
   }
-  return result;
 };
 
 // --- FETCH APPOINTMENTS ---
@@ -275,7 +256,7 @@ export const fetchDoctorAppointments = async (token) => {
     return response.data.data;
   } catch (error) {
     console.error("FETCH_APPOINTMENTS_ERROR", error);
-    return [];
+    throw error;
   }
 };
 
@@ -295,14 +276,12 @@ export const updateAppointmentStatus = async (token, data) => {
     return response.data.data;
   } catch (error) {
     console.error("UPDATE_STATUS_ERROR", error);
-    toast.error("Failed to update status");
     throw error; 
   }
 };
 
 // --- BOOK APPOINTMENT ---
 export const bookAppointmentApi = async (data, token, navigate) => {
-  const toastId = toast.loading("Processing request...");
   try {
     const response = await apiConnector(
       "POST", 
@@ -315,20 +294,17 @@ export const bookAppointmentApi = async (data, token, navigate) => {
       throw new Error(response.data.message);
     }
 
-    toast.success("Request Sent! Check your email.");
     navigate("/patient-dashboard/appointments"); 
+    return response.data;
     
   } catch (error) {
     console.log("BOOK_APPOINTMENT_ERROR:", error);
-    toast.error(error.response?.data?.message || "Could not book appointment");
-  } finally {
-    toast.dismiss(toastId);
+    throw error;
   }
 };
 
 // --- FETCH SLOTS BY DATE ---
 export const fetchTimeSlotsbyDate = async (doctorId, date) => {
-  let result = [];
   try {
     const response = await apiConnector(
       "GET", 
@@ -341,11 +317,11 @@ export const fetchTimeSlotsbyDate = async (doctorId, date) => {
     if (!response?.data?.success) {
       throw new Error(response.data.message);
     }
-    result = response.data.data;
+    return response.data.data;
   } catch (error) {
     console.log("FETCH_SLOTS_ERROR:", error);
+    throw error;
   }
-  return result;
 };
 
 // --- DASHBOARD STATS ---
@@ -364,7 +340,6 @@ export const fetchDashboardStats = async (token) => {
     return response.data.data;
   } catch (error) {
     console.error("FETCH_STATS_ERROR", error);
-    toast.error("Could not load dashboard data");
-    return null;
+    throw error;
   }
 };

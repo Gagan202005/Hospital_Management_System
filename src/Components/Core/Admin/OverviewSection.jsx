@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { 
-    Users, Stethoscope, Calendar, DollarSign, Activity, Clock 
+    Users, Stethoscope, Calendar, IndianRupee, Activity, Clock 
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../ui/card";
 import { Badge } from "../../ui/badge";
@@ -8,10 +8,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { useSelector } from "react-redux";
 import { fetchAdminStats } from "../../../services/operations/AdminApi";
 
+// --- CHANGED: Added 'Sector' for the custom active shape ---
+import { 
+    PieChart, Pie, Sector, Cell, ResponsiveContainer 
+} from "recharts";
+
 export const OverviewSection = () => {
   const { token } = useSelector((state) => state.auth);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // State for Chart Interactivity
+  const [activeIndex, setActiveIndex] = useState(0);
 
   // --- Data Fetching ---
   useEffect(() => {
@@ -22,7 +30,11 @@ export const OverviewSection = () => {
             const data = await fetchAdminStats(token);
             if (data) setStats(data);
         } catch (error) {
-            console.error("Failed to load admin stats", error);
+            console.error("STATS ERROR:", error);
+            // Since this is just loading stats, we might not want to toast error on load,
+            // but we log the specific backend message for debugging.
+            const message = error.response?.data?.message || error.message;
+            console.log("Details:", message);
         }
       }
       setLoading(false);
@@ -32,6 +44,58 @@ export const OverviewSection = () => {
 
   if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Initializing Dashboard...</div>;
   if (!stats) return <div className="p-12 text-center text-red-500">System data unavailable.</div>;
+
+  // --- PREPARE DATA ---
+  const chartData = [
+    { name: "Completed", value: stats.appointmentStats.completed, color: "#10b981" }, // Emerald
+    { name: "Scheduled", value: stats.appointmentStats.scheduled, color: "#3b82f6" }, // Blue
+    { name: "Cancelled", value: stats.appointmentStats.cancelled, color: "#ef4444" }, // Red
+  ];
+
+  const onPieEnter = (_, index) => {
+    setActiveIndex(index);
+  };
+
+  // --- CUSTOM ACTIVE SHAPE (The "Grow" Effect) ---
+  const renderActiveShape = (props) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+
+    return (
+      <g>
+        {/* Center Text */}
+        <text x={cx} y={cy} dy={-10} textAnchor="middle" fill="#334155" className="text-sm font-semibold">
+          {payload.name}
+        </text>
+        <text x={cx} y={cy} dy={15} textAnchor="middle" fill="#94a3b8" className="text-xs">
+          {`${(percent * 100).toFixed(1)}%`}
+        </text>
+
+        {/* The Active Slice (Slightly larger) */}
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius + 6} // Makes it pop out
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+          cornerRadius={6} // Rounded edges
+        />
+        {/* The Outer Glow Ring */}
+        <Sector
+          cx={cx}
+          cy={cy}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          innerRadius={outerRadius + 8}
+          outerRadius={outerRadius + 12}
+          fill={fill}
+          opacity={0.3} // Faded ring
+          cornerRadius={10}
+        />
+      </g>
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -67,8 +131,8 @@ export const OverviewSection = () => {
         />
         <StatsCard 
             title="Revenue Generated" 
-            value={`$${stats.counts.revenue.toLocaleString()}`} 
-            icon={<DollarSign className="h-5 w-5 text-emerald-600" />} 
+            value={`₹${stats.counts.revenue.toLocaleString()}`} 
+            icon={<IndianRupee className="h-5 w-5 text-emerald-600" />} 
             color="border-l-emerald-500"
             subtext="Consultation fees collected"
         />
@@ -118,21 +182,57 @@ export const OverviewSection = () => {
           </CardContent>
         </Card>
 
-        {/* Status Breakdown */}
-        <Card className="shadow-sm border-slate-200">
+        {/* --- INTERACTIVE DONUT CHART SECTION --- */}
+        <Card className="shadow-sm border-slate-200 flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg text-slate-800">
               <Activity className="w-5 h-5 text-slate-500" />
               Workflow Status
             </CardTitle>
-            <CardDescription>Appointment lifecycle metrics.</CardDescription>
+            <CardDescription>Hover over segments for details.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <StatusRow label="Completed" count={stats.appointmentStats.completed} total={stats.counts.appointments} color="bg-emerald-500" />
-            <StatusRow label="Scheduled" count={stats.appointmentStats.scheduled} total={stats.counts.appointments} color="bg-blue-500" />
-            <StatusRow label="Cancelled" count={stats.appointmentStats.cancelled} total={stats.counts.appointments} color="bg-red-500" />
+          
+          <CardContent className="flex-1 flex flex-col items-center justify-center min-h-[350px]">
+            {chartData.every(d => d.value === 0) ? (
+                <div className="text-slate-400 text-sm">No appointment data available yet.</div>
+            ) : (
+                <div className="w-full h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                activeIndex={activeIndex}
+                                activeShape={renderActiveShape} // Uses the custom shape defined above
+                                data={chartData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={65} // Donut style
+                                outerRadius={85}
+                                paddingAngle={4} // Gap between slices
+                                dataKey="value"
+                                onMouseEnter={onPieEnter} // Triggers the animation
+                                cornerRadius={6} // Rounded edges
+                            >
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
+                                ))}
+                            </Pie>
+                        </PieChart>
+                    </ResponsiveContainer>
+                    
+                    {/* Manual Legend for clarity */}
+                    <div className="flex justify-center gap-6 mt-2">
+                        {chartData.map((item, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                                <span className="text-sm text-slate-600 font-medium">{item.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
           </CardContent>
         </Card>
+
       </div>
     </div>
   );
@@ -151,21 +251,6 @@ function StatsCard({ title, value, icon, color, subtext }) {
             <p className="text-xs text-slate-400 mt-1">{subtext}</p>
           </CardContent>
         </Card>
-    )
-}
-
-function StatusRow({ label, count, total, color }) {
-    const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
-    return (
-        <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-                <span className="font-medium text-slate-700">{label}</span>
-                <span className="text-slate-500 font-mono">{count} ({percentage}%)</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
-            </div>
-        </div>
     )
 }
 

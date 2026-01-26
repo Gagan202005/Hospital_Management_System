@@ -52,11 +52,19 @@ export const AddAdminSection = () => {
              ),
              { duration: 8000, position: "top-center" }
            );
-      } 
+      } else {
+           // Fallback if no password returned but success is true
+           toast.success("Admin added successfully.");
+      }
 
       setFormData({ firstName: "", lastName: "", email: "", phoneno: "", gender: "", dob: "", address: "" });
 
-    } catch (error) { console.error(error); } 
+    } catch (error) { 
+        console.error("ADD ADMIN ERROR:", error);
+        // >>> UPDATED: Show backend error message <<<
+        const errorMessage = error.response?.data?.message || error.message || "Failed to create admin.";
+        toast.error(errorMessage);
+    } 
     finally { setIsLoading(false); }
   };
 

@@ -40,8 +40,14 @@ export default function PatientAppointmentsSection() {
     const loadData = async () => {
       setLoading(true);
       if (token) {
-        const data = await fetchPatientAppointments(token);
-        if (data) setAppointments(data);
+        try {
+          const data = await fetchPatientAppointments(token);
+          if (data) setAppointments(data);
+        } catch (error) {
+          console.error("LOAD DATA ERROR:", error);
+          const errorMessage = error.response?.data?.message || error.message || "Failed to load appointments";
+          toast.error(errorMessage);
+        }
       }
       setLoading(false);
     };
@@ -65,8 +71,9 @@ export default function PatientAppointmentsSection() {
         toast.error("Medical report pending generation.");
       }
     } catch (error) {
-      console.error("Report Fetch Error", error);
-      toast.error("Unable to retrieve report.");
+      console.error("REPORT FETCH ERROR:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Unable to retrieve report";
+      toast.error(errorMessage);
     } finally {
       setIsReportLoading(false);
     }
@@ -75,7 +82,7 @@ export default function PatientAppointmentsSection() {
   // --- 3. Status Badge Logic ---
   const getStatusConfig = (status) => {
     switch (status) {
-      case "Scheduled": return { color: "bg-blue-50 text-blue-700 border-blue-200", label: "Scheduled" };
+      case "Pending": return { color: "bg-blue-50 text-blue-700 border-blue-200", label: "Pending" };
       case "Confirmed": return { color: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Confirmed" };
       case "Completed": return { color: "bg-slate-100 text-slate-600 border-slate-200", label: "Visit Completed" };
       case "Cancelled": return { color: "bg-red-50 text-red-700 border-red-200", label: "Cancelled" };
@@ -111,7 +118,7 @@ export default function PatientAppointmentsSection() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <Input
-          placeholder="Filter by doctor name, specialty, or reason..."
+          placeholder="Filter by doctor name, or reason..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10 border-slate-200 focus:ring-emerald-500"
@@ -304,6 +311,8 @@ export function ViewReportContent({ data }) {
             window.URL.revokeObjectURL(blobUrl);
         } catch (error) {
             console.error("Download failed, opening in new tab instead", error);
+            const errorMessage = error.response?.data?.message || error.message || "Download failed";
+            toast.error(errorMessage);
             window.open(url, '_blank');
         }
     };

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "../../ui/textarea";
 import { 
   Stethoscope, Search, Edit, Trash2, Loader2, Copy, 
-  Plus, X, Users, Building2, IdCard 
+  Plus, X, Users, Building2, IdCard, CheckCircle 
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
@@ -39,7 +39,6 @@ export const AddDoctorSection = () => {
   const fetchDoctors = async () => {
     setIsFetching(true);
     try {
-      // Assuming this returns the array of doctors including 'doctorID'
       const response = await getAllUsers(token, "doctor");
       if (Array.isArray(response)) {
         // Sort by newest created first
@@ -47,7 +46,9 @@ export const AddDoctorSection = () => {
         setDoctors(sorted);
       }
     } catch (error) { 
-      console.error("Fetch Error:", error); 
+      console.error("Fetch Error:", error);
+      // Optional: Display toast for fetch error
+      // toast.error("Failed to load doctor list.");
     } finally { 
       setIsFetching(false); 
     }
@@ -93,26 +94,38 @@ export const AddDoctorSection = () => {
     setIsLoading(true);
     try {
       if (isEditing) {
+        // --- UPDATE ---
         await Update_Doctor({ ...formData, _id: editId }, token);
         toast.success("Doctor profile updated successfully");
       } else {
+        // --- ADD ---
         const res = await Add_Doctor(formData, token, dispatch);
+        
+        // Handle Password Display Toast
         if(res?.generatedPassword) {
            toast.success((t) => (
                <div className="flex flex-col gap-1">
-                 <span className="font-bold">Doctor Onboarded!</span>
-                 <div className="flex items-center gap-2 text-sm bg-white/20 p-2 rounded mt-1">
+                 <span className="font-bold flex items-center gap-2"><CheckCircle className="w-4 h-4"/> Doctor Onboarded!</span>
+                 <div className="flex items-center gap-2 text-sm bg-white/20 p-2 rounded mt-1 border border-white/10">
                    Pass: <code className="font-mono font-bold">{res.generatedPassword}</code>
                    <button onClick={() => { navigator.clipboard.writeText(res.generatedPassword); toast.success("Copied"); }} className="p-1 hover:bg-black/10 rounded"><Copy className="w-3 h-3" /></button>
                  </div>
+                 <span className="text-[10px] opacity-80">Credentials sent to email.</span>
                </div>
              ), { duration: 8000 });
+        } else {
+            // Fallback success message
+            toast.success("Doctor added successfully.");
         }
       }
       fetchDoctors(); 
       resetForm();
+
     } catch (error) { 
       console.error(error); 
+      // >>> UPDATED: Show Backend Error Message <<<
+      const errorMessage = error.response?.data?.message || error.message || "Operation failed.";
+      toast.error(errorMessage);
     } finally { 
       setIsLoading(false); 
     }
@@ -133,9 +146,17 @@ export const AddDoctorSection = () => {
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm("Are you sure you want to delete this doctor?")) {
-        await Delete_Doctor(id, token);
-        fetchDoctors();
+    if(window.confirm("Are you sure you want to delete this doctor? This action is irreversible.")) {
+        try {
+            await Delete_Doctor(id, token);
+            toast.success("Doctor record deleted successfully.");
+            fetchDoctors();
+        } catch (error) {
+            console.error("DELETE ERROR:", error);
+            // >>> UPDATED: Show Backend Error Message <<<
+            const errorMessage = error.response?.data?.message || error.message || "Failed to delete doctor.";
+            toast.error(errorMessage);
+        }
     }
   };
 

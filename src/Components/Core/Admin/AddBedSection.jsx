@@ -6,7 +6,7 @@ import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { Badge } from "../../ui/badge";
-import { Bed, Search, Edit, Trash2, User, Loader2, Save, X, Activity, CheckCircle, LogOut, LayoutGrid } from "lucide-react";
+import { Bed, Search, Edit, Trash2, User, Loader2, Save, X, Activity, CheckCircle, LogOut, LayoutGrid, AlertCircle } from "lucide-react";
 import { useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
 import { GetAll_Beds, Add_Bed, Update_Bed, Delete_Bed, Allocate_Bed, Discharge_Bed } from "../../../services/operations/AdminApi";
@@ -38,8 +38,12 @@ export const AddBedSection = () => {
     try {
       const response = await GetAll_Beds(token);
       if (Array.isArray(response)) setBeds(response);
-    } catch (error) { console.error(error); } 
-    finally { setIsFetching(false); }
+    } catch (error) { 
+        console.error("FETCH BEDS ERROR:", error);
+        // Optional: toast.error("Failed to fetch bed list");
+    } finally { 
+        setIsFetching(false); 
+    }
   };
 
   useEffect(() => { fetchBeds(); }, [token]);
@@ -51,36 +55,101 @@ export const AddBedSection = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      if(!formData.ward || !formData.type) { toast.error("Select Ward/Type"); setIsLoading(false); return; }
-      if (isEditing) await Update_Bed({ ...formData, _id: editId }, token);
-      else await Add_Bed(formData, token);
+      // Manual Validation
+      if(!formData.ward || !formData.type) { 
+          throw new Error("Please select both Ward and Room Type.");
+      }
+
+      if (isEditing) {
+        // --- UPDATE ---
+        await Update_Bed({ ...formData, _id: editId }, token);
+        toast.success("Bed details updated successfully.");
+      } else {
+        // --- ADD ---
+        await Add_Bed(formData, token);
+        toast.success("New bed added to inventory.");
+      }
+
       fetchBeds();
       setFormData({ bedNumber: "", ward: "", type: "", roomNumber: "", floorNumber: "", dailyCharge: "", status: "Available" });
-      setIsEditing(false); setEditId(null);
-    } catch (error) { console.error(error); } 
-    finally { setIsLoading(false); }
+      setIsEditing(false); 
+      setEditId(null);
+
+    } catch (error) { 
+        console.error("SUBMIT ERROR:", error);
+        const errorMessage = error.response?.data?.message || error.message || "Operation failed.";
+        toast.error(errorMessage);
+    } finally { 
+        setIsLoading(false); 
+    }
   };
 
   const handleEditClick = (bed) => {
-    if (bed.status === "Occupied") return toast.error("Discharge patient first.");
-    setIsEditing(true); setEditId(bed._id);
-    setFormData({ bedNumber: bed.bedNumber, ward: bed.ward, type: bed.type, roomNumber: bed.roomNumber, floorNumber: bed.floorNumber, dailyCharge: bed.dailyCharge, status: bed.status });
+    if (bed.status === "Occupied") return toast.error("Cannot edit an occupied bed. Discharge patient first.");
+    
+    setIsEditing(true); 
+    setEditId(bed._id);
+    setFormData({ 
+        bedNumber: bed.bedNumber, 
+        ward: bed.ward, 
+        type: bed.type, 
+        roomNumber: bed.roomNumber, 
+        floorNumber: bed.floorNumber, 
+        dailyCharge: bed.dailyCharge, 
+        status: bed.status 
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (bed) => {
     if (bed.status === "Occupied") return toast.error("Cannot delete occupied bed.");
-    if(window.confirm("Delete bed?")) { await Delete_Bed(bed._id, token); fetchBeds(); }
+    
+    if(window.confirm("Are you sure you want to delete this bed?")) { 
+        try {
+            await Delete_Bed(bed._id, token); 
+            toast.success("Bed removed from inventory.");
+            fetchBeds(); 
+        } catch (error) {
+            console.error("DELETE ERROR:", error);
+            const errorMessage = error.response?.data?.message || error.message || "Failed to delete bed.";
+            toast.error(errorMessage);
+        }
+    }
   };
 
   const handleAllocateSubmit = async (e) => {
-      e.preventDefault(); setIsLoading(true);
-      const success = await Allocate_Bed({ bedId: selectedBedId, patientIdInput }, token);
-      if(success) { setIsAllocateModalOpen(false); fetchBeds(); }
-      setIsLoading(false);
+      e.preventDefault(); 
+      setIsLoading(true);
+      try {
+          const response = await Allocate_Bed({ bedId: selectedBedId, patientIdInput }, token);
+          
+          toast.success(response?.message || "Patient admitted successfully.");
+          setIsAllocateModalOpen(false); 
+          fetchBeds(); 
+          setPatientIdInput(""); // Reset input
+
+      } catch (error) {
+          console.error("ALLOCATE ERROR:", error);
+          const errorMessage = error.response?.data?.message || error.message || "Allocation failed.";
+          toast.error(errorMessage);
+      } finally {
+          setIsLoading(false);
+      }
   };
 
-  const handleDischarge = async (id) => { if(window.confirm("Discharge patient?")) { await Discharge_Bed(id, token); fetchBeds(); } };
+  const handleDischarge = async (id) => { 
+      if(window.confirm("Confirm patient discharge? This will free up the bed.")) { 
+          try {
+              await Discharge_Bed(id, token); 
+              toast.success("Patient discharged successfully.");
+              fetchBeds(); 
+          } catch (error) {
+              console.error("DISCHARGE ERROR:", error);
+              const errorMessage = error.response?.data?.message || error.message || "Discharge failed.";
+              toast.error(errorMessage);
+          }
+      } 
+  };
 
   const filtered = useMemo(() => {
     if (!searchQuery) return beds;
@@ -91,18 +160,31 @@ export const AddBedSection = () => {
   const stats = useMemo(() => ({
     total: beds.length,
     occupied: beds.filter(b => b.status === "Occupied").length,
-    available: beds.filter(b => b.status === "Available").length
+    available: beds.filter(b => b.status === "Available").length,
+    maintenance: beds.filter(b => b.status === "Maintenance").length
   }), [beds]);
+
+  // --- Helper for Dynamic Styles ---
+  const getStatusStyles = (status) => {
+      switch(status) {
+          case "Occupied": return { card: "border-red-200 bg-red-50/30", badge: "bg-red-100 text-red-700 hover:bg-red-100" };
+          case "Maintenance": return { card: "border-amber-200 bg-amber-50/30", badge: "bg-amber-100 text-amber-700 hover:bg-amber-100" };
+          default: return { card: "border-green-200 bg-green-50/30", badge: "bg-green-100 text-green-700 hover:bg-green-100" };
+      }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-blue-50 border-blue-100 shadow-sm"><CardContent className="p-4 flex justify-between"><div><p className="text-blue-600 text-sm font-medium">Capacity</p><h3 className="text-2xl font-bold text-blue-900">{stats.total}</h3></div><Bed className="h-8 w-8 text-blue-300"/></CardContent></Card>
           <Card className="bg-green-50 border-green-100 shadow-sm"><CardContent className="p-4 flex justify-between"><div><p className="text-green-600 text-sm font-medium">Available</p><h3 className="text-2xl font-bold text-green-900">{stats.available}</h3></div><CheckCircle className="h-8 w-8 text-green-300"/></CardContent></Card>
           <Card className="bg-red-50 border-red-100 shadow-sm"><CardContent className="p-4 flex justify-between"><div><p className="text-red-600 text-sm font-medium">Occupied</p><h3 className="text-2xl font-bold text-red-900">{stats.occupied}</h3></div><Activity className="h-8 w-8 text-red-300"/></CardContent></Card>
+          <Card className="bg-amber-50 border-amber-100 shadow-sm"><CardContent className="p-4 flex justify-between"><div><p className="text-amber-600 text-sm font-medium">Issues</p><h3 className="text-2xl font-bold text-amber-900">{stats.maintenance}</h3></div><AlertCircle className="h-8 w-8 text-amber-300"/></CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Form Section */}
         <Card className={`h-fit ${isEditing ? "border-indigo-500 shadow-md" : "border-slate-200"}`}>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -131,29 +213,50 @@ export const AddBedSection = () => {
           </CardContent>
         </Card>
 
+        {/* List Section */}
         <Card className="h-[800px] flex flex-col border-slate-200 shadow-sm">
           <CardHeader><CardTitle>Ward Status</CardTitle><div className="relative mt-2"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400"/><Input placeholder="Search..." className="pl-9" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)}/></div></CardHeader>
           <CardContent className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
             {isFetching ? <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-600"/></div> : (
               <div className="space-y-3">
-                {filtered.map(bed => (
-                    <div key={bed._id} className={`p-4 border rounded-xl shadow-sm bg-white ${bed.status === 'Occupied' ? 'border-red-200 bg-red-50/20' : 'border-green-200 bg-green-50/20'}`}>
-                        <div className="flex justify-between">
-                            <div>
-                                <div className="flex items-center gap-2"><h4 className="font-bold text-slate-900">{bed.bedNumber}</h4><Badge className={bed.status==="Occupied"?"bg-red-100 text-red-700 hover:bg-red-100":"bg-green-100 text-green-700 hover:bg-green-100"}>{bed.status}</Badge></div>
-                                <p className="text-xs text-slate-500 mt-1">{bed.ward} • {bed.type}</p>
-                                {bed.patient && <div className="mt-2 flex items-center gap-1 text-xs font-bold text-slate-700"><User className="w-3 h-3"/> {bed.patient.firstName} {bed.patient.lastName}</div>}
+                {filtered.map(bed => {
+                    const styles = getStatusStyles(bed.status);
+                    return (
+                        <div key={bed._id} className={`p-4 border rounded-xl shadow-sm bg-white ${styles.card}`}>
+                            <div className="flex justify-between">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="font-bold text-slate-900">{bed.bedNumber}</h4>
+                                        <Badge className={styles.badge}>{bed.status}</Badge>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">{bed.ward} • {bed.type}</p>
+                                    {bed.patient && <div className="mt-2 flex items-center gap-1 text-xs font-bold text-slate-700"><User className="w-3 h-3"/> {bed.patient.firstName} {bed.patient.lastName}</div>}
+                                </div>
+                                <div className="flex gap-1">
+                                    <Button variant="ghost" size="icon" disabled={bed.status === "Occupied"} onClick={()=>handleEditClick(bed)} className="h-7 w-7 text-blue-600 hover:bg-blue-50"><Edit className="w-3 h-3"/></Button>
+                                    <Button variant="ghost" size="icon" disabled={bed.status === "Occupied"} onClick={()=>handleDelete(bed)} className="h-7 w-7 text-red-500 hover:bg-red-50"><Trash2 className="w-3 h-3"/></Button>
+                                </div>
                             </div>
-                            <div className="flex gap-1">
-                                <Button variant="ghost" size="icon" disabled={bed.status==="Occupied"} onClick={()=>handleEditClick(bed)} className="h-7 w-7 text-blue-600"><Edit className="w-3 h-3"/></Button>
-                                <Button variant="ghost" size="icon" disabled={bed.status==="Occupied"} onClick={()=>handleDelete(bed)} className="h-7 w-7 text-red-500"><Trash2 className="w-3 h-3"/></Button>
+                            
+                            {/* Action Buttons Logic */}
+                            <div className="mt-3 pt-3 border-t border-dashed border-slate-200 flex justify-end">
+                                {bed.status === "Available" ? (
+                                    <Button size="sm" className="bg-indigo-600 h-8 text-xs hover:bg-indigo-700" onClick={()=>{setSelectedBedId(bed._id); setIsAllocateModalOpen(true);}}>
+                                        Admit Patient
+                                    </Button>
+                                ) : bed.status === "Occupied" ? (
+                                    <Button size="sm" variant="outline" className="border-red-200 text-red-600 h-8 text-xs hover:bg-red-50" onClick={()=>handleDischarge(bed._id)}>
+                                        <LogOut className="w-3 h-3 mr-1"/> Discharge
+                                    </Button>
+                                ) : (
+                                    <Button size="sm" variant="outline" disabled className="border-amber-200 text-amber-600 h-8 text-xs bg-amber-50 opacity-100 cursor-not-allowed">
+                                        <AlertCircle className="w-3 h-3 mr-1"/> Under Maintenance
+                                    </Button>
+                                )}
                             </div>
                         </div>
-                        <div className="mt-3 pt-3 border-t border-dashed border-slate-200 flex justify-end">
-                            {bed.status === "Available" ? <Button size="sm" className="bg-indigo-600 h-8 text-xs" onClick={()=>{setSelectedBedId(bed._id); setIsAllocateModalOpen(true);}}>Admit Patient</Button> : <Button size="sm" variant="outline" className="border-red-200 text-red-600 h-8 text-xs hover:bg-red-50" onClick={()=>handleDischarge(bed._id)}><LogOut className="w-3 h-3 mr-1"/> Discharge</Button>}
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
               </div>
             )}
           </CardContent>

@@ -8,34 +8,39 @@ import { Textarea } from "../../ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { Badge } from "../../ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../ui/dialog";
-import { useToast } from "../../../hooks/use-toast";
+// Using the hook version of toast
+import { useToast } from "../../../hooks/use-toast"; 
 import { useSelector, useDispatch } from "react-redux";
 
 // API
 import { updateAdminProfile, updateAdminPfp } from "../../../services/operations/AdminApi";
-import { changePassword } from "../../../services/operations/authApi"; // Unified Auth API
+import { changePassword } from "../../../services/operations/authApi"; 
 
 export function AdminProfileSection() {
   const { token } = useSelector((state) => state.auth);
   const { user } = useSelector((state) => state.profile); 
   const dispatch = useDispatch();
-  const { toast } = useToast();
+  const { toast } = useToast(); 
   const fileInputRef = useRef(null);
   
   // UI States
   const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  
+  // Password State
   const [passData, setPassData] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
 
+  // Profile State
   const [profile, setProfile] = useState({
     firstName: "", lastName: "", email: "", phoneno: "", 
     dob: "", age: "", gender: "", address: "", image: "", 
     adminID: "", about: ""
   });
+  
+  // Editing State (Separate from display state)
   const [editedProfile, setEditedProfile] = useState(profile);
 
-  // --- Sync State ---
+  // --- Sync State with Redux ---
   useEffect(() => {
     if (user) {
       const sanitizedData = {
@@ -50,22 +55,45 @@ export function AdminProfileSection() {
   }, [user]);
 
   // --- Handlers: Profile ---
-  const handleEditToggle = () => { if (isEditing) setEditedProfile(profile); setIsEditing(!isEditing); };
+  const handleEditToggle = () => { 
+      if (isEditing) setEditedProfile(profile); // Reset changes if cancelling
+      setIsEditing(!isEditing); 
+  };
   
   const handleSave = async () => {
+    // 1. Validation
     if (!editedProfile.firstName?.trim() || !editedProfile.phoneno?.trim()) {
         toast({ title: "Validation Error", description: "Name and Phone are required.", variant: "destructive" });
         return;
     }
-    await updateAdminProfile(editedProfile, token, dispatch, toast);
-    setIsEditing(false);
+
+    // 2. API Call with Try/Catch
+    try {
+        await updateAdminProfile(editedProfile, token, dispatch);
+        
+        toast({ title: "Success", description: "Profile updated successfully." });
+        setIsEditing(false);
+
+    } catch (error) {
+        // 4. Error Handling
+        const errorMessage = error.response?.data?.message || error.message || "Failed to update profile";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    }
   };
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      await updateAdminPfp(token, file, dispatch, toast);
-      setProfile(prev => ({ ...prev, image: URL.createObjectURL(file) }));
+      try {
+          await updateAdminPfp(token, file, dispatch);
+          
+          setProfile(prev => ({ ...prev, image: URL.createObjectURL(file) }));
+          toast({ title: "Success", description: "Profile picture updated." });
+
+      } catch (error) {
+          const errorMessage = error.response?.data?.message || error.message || "Failed to upload image";
+          toast({ title: "Upload Failed", description: errorMessage, variant: "destructive" });
+      }
     }
   };
 
@@ -75,14 +103,24 @@ export function AdminProfileSection() {
   const handlePassChange = (e) => setPassData({...passData, [e.target.name]: e.target.value});
   
   const submitPassword = async () => {
+      // Client-side validation
       if(passData.newPassword !== passData.confirmPassword) {
           toast({ title: "Mismatch", description: "Passwords do not match.", variant: "destructive" });
           return;
       }
-      const success = await changePassword(token, passData);
-      if(success) {
-          setIsPasswordModalOpen(false);
-          setPassData({ oldPassword: "", newPassword: "", confirmPassword: "" });
+
+      try {
+          const success = await changePassword(token, passData);
+          if(success) {
+              setIsPasswordModalOpen(false);
+              setPassData({ oldPassword: "", newPassword: "", confirmPassword: "" });
+              toast({ title: "Success", description: "Password changed successfully." });
+          }
+      } catch (error) {
+           console.error("CHANGE PASSWORD ERROR:", error);
+           // >>> SHOW BACKEND ERROR MESSAGE <<<
+           const errorMessage = error.response?.data?.message || error.message || "Failed to change password.";
+           toast({ title: "Error", description: errorMessage, variant: "destructive" });
       }
   };
 
@@ -119,6 +157,7 @@ export function AdminProfileSection() {
         
         {/* LEFT COLUMN */}
         <div className="space-y-6">
+            {/* ID CARD */}
             <Card className="shadow-sm border-slate-200 border-t-4 border-t-indigo-600">
                 <CardHeader><CardTitle>Identity Card</CardTitle></CardHeader>
                 <CardContent className="flex flex-col items-center space-y-6">
@@ -144,6 +183,7 @@ export function AdminProfileSection() {
                 </CardContent>
             </Card>
 
+            {/* SECURITY CARD */}
             <Card className="shadow-sm border-slate-200 border-l-4 border-l-red-500 bg-red-50/10">
                 <CardHeader className="pb-3"><CardTitle className="text-md flex items-center gap-2"><Lock className="w-4 h-4 text-red-500"/> Security</CardTitle></CardHeader>
                 <CardContent>
@@ -157,6 +197,8 @@ export function AdminProfileSection() {
 
         {/* RIGHT COLUMN */}
         <div className="lg:col-span-2 space-y-6">
+            
+            {/* PERSONAL DETAILS */}
             <Card className="shadow-sm border-slate-200">
                 <CardHeader><CardTitle className="flex items-center gap-2"><User className="h-5 w-5 text-indigo-500"/> Personal Details</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -168,6 +210,7 @@ export function AdminProfileSection() {
                 </CardContent>
             </Card>
 
+            {/* BIO */}
             <Card className="shadow-sm border-slate-200">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-indigo-500"/> Bio & Role</CardTitle></CardHeader>
                 <CardContent>

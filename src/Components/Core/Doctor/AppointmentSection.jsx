@@ -15,6 +15,7 @@ import {
   Paperclip,
   Download,
   X,
+  Loader2, 
 } from "lucide-react";
 import { Card, CardContent } from "../../ui/card";
 import { Badge } from "../../ui/badge";
@@ -36,6 +37,10 @@ export default function AppointmentSection() {
   const { token } = useSelector((state) => state.auth);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // --- STATE: Track which specific appointment and status is loading ---
+  const [actionLoading, setActionLoading] = useState({ id: null, status: null });
+
   const [searchTerm, setSearchTerm] = useState("");
 
   const [selectedAppt, setSelectedAppt] = useState(null);
@@ -56,6 +61,8 @@ export default function AppointmentSection() {
           if (data) setAppointments(data);
         } catch (error) {
           console.error("Fetch Error", error);
+          const errorMessage = error.response?.data?.message || error.message || "Failed to load appointments";
+          toast({ title: "Error", description: errorMessage, variant: "destructive" });
         }
       }
       setLoading(false);
@@ -63,13 +70,19 @@ export default function AppointmentSection() {
     loadData();
   }, [token]);
 
+  // --- HANDLER: Manages loading state & Toasts ---
   const handleStatusChange = async (id, newStatus) => {
+    setActionLoading({ id, status: newStatus }); 
     try {
       await updateAppointmentStatus(token, { appointmentId: id, status: newStatus });
       setAppointments((prev) => prev.map((appt) => (appt._id === id ? { ...appt, status: newStatus } : appt)));
       toast({ title: "Status Updated", description: `Appointment marked as ${newStatus}` });
     } catch (error) {
-      toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+      console.error("STATUS UPDATE ERROR:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Failed to update status";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    } finally {
+      setActionLoading({ id: null, status: null });
     }
   };
 
@@ -83,26 +96,38 @@ export default function AppointmentSection() {
   const handleEditReport = async (appt) => {
     setSelectedAppt(appt);
     setIsEditMode(true);
-    const data = await fetchVisitReport(token, appt._id);
-    if (data) {
-      setExistingReportData(data);
-      setIsReportOpen(true);
-    } else {
-      toast({ title: "Error", description: "Could not fetch report" });
+    try {
+        const data = await fetchVisitReport(token, appt._id);
+        if (data) {
+          setExistingReportData(data);
+          setIsReportOpen(true);
+        } else {
+          toast({ title: "Error", description: "Could not fetch report data", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("FETCH REPORT ERROR:", error);
+        const errorMessage = error.response?.data?.message || error.message || "Error loading report";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
   };
 
   const handleReportSuccess = (appointmentId) => {
     setAppointments((prev) => prev.map((a) => (a._id === appointmentId ? { ...a, status: "Completed" } : a)));
     setIsReportOpen(false);
-    toast({ title: "Encounter Completed", description: "Report generated." });
+    toast({ title: "Encounter Completed", description: "Report generated successfully." });
   };
 
   const handleViewReport = async (appointmentId) => {
-    const data = await fetchVisitReport(token, appointmentId);
-    if (data) {
-      setViewReportData(data);
-      setIsViewOpen(true);
+    try {
+        const data = await fetchVisitReport(token, appointmentId);
+        if (data) {
+          setViewReportData(data);
+          setIsViewOpen(true);
+        }
+    } catch (error) {
+        console.error("VIEW REPORT ERROR:", error);
+        const errorMessage = error.response?.data?.message || error.message || "Failed to open report";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
   };
 
@@ -149,6 +174,7 @@ export default function AppointmentSection() {
               <AppointmentCard
                 key={apt._id}
                 appt={apt}
+                actionLoading={actionLoading}
                 onStatusChange={handleStatusChange}
                 onInitiate={() => handleInitiateEncounter(apt)}
               />
@@ -167,6 +193,7 @@ export default function AppointmentSection() {
                 key={apt._id}
                 appt={apt}
                 isHistory={true}
+                actionLoading={actionLoading}
                 onView={() => handleViewReport(apt._id)}
                 onEdit={() => handleEditReport(apt)}
               />
@@ -175,6 +202,7 @@ export default function AppointmentSection() {
         </TabsContent>
       </Tabs>
 
+      {/* Report Creation Modal */}
       <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
           <DialogHeader className="p-5 border-b bg-slate-50 flex-shrink-0">
@@ -197,6 +225,7 @@ export default function AppointmentSection() {
         </DialogContent>
       </Dialog>
 
+      {/* View Report Modal */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
         <DialogContent className="max-w-3xl h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-5 border-b flex-shrink-0">
@@ -214,33 +243,20 @@ export default function AppointmentSection() {
   );
 }
 
-function AppointmentCard({ appt, onStatusChange, onInitiate, isHistory, onView, onEdit }) {
+// ============================================================================
+// SUB-COMPONENT: APPOINTMENT CARD
+// ============================================================================
+function AppointmentCard({ appt, onStatusChange, onInitiate, isHistory, onView, onEdit, actionLoading }) {
+  const isCardLoading = actionLoading?.id === appt._id;
+
   const getStatusBadge = (status) => {
     switch (status) {
-      case "Confirmed":
-        return (
-          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200">
-            Confirmed
-          </Badge>
-        );
-      case "Pending":
-        return (
-          <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200">
-            Pending
-          </Badge>
-        );
-      case "Scheduled":
-        return <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">Scheduled</Badge>;
-      case "Completed":
-        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300">Completed</Badge>;
-      case "Cancelled":
-        return (
-          <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
-            Cancelled
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+      case "Confirmed": return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200">Confirmed</Badge>;
+      case "Pending": return <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200">Pending</Badge>;
+      case "Scheduled": return <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">Scheduled</Badge>;
+      case "Completed": return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300">Completed</Badge>;
+      case "Cancelled": return <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200">Cancelled</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -256,48 +272,27 @@ function AppointmentCard({ appt, onStatusChange, onInitiate, isHistory, onView, 
               {appt.patientDetails?.firstName} {appt.patientDetails?.lastName}
             </h4>
             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mt-1">
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> {new Date(appt.date).toLocaleDateString()}
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="w-3 h-3" /> {appt.timeSlot}
-              </span>
-              {appt.reason && (
-                <>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-600 font-medium">{appt.reason}</span>
-                </>
-              )}
+              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(appt.date).toLocaleDateString()}</span>
+              <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {appt.timeSlot}</span>
+              {appt.reason && <><span className="text-slate-300">|</span><span className="text-slate-600 font-medium">{appt.reason}</span></>}
             </div>
           </div>
         </div>
 
         <div className="flex flex-col items-end gap-3 min-w-[160px]">
           {getStatusBadge(appt.status)}
-
           {!isHistory ? (
             <div className="flex gap-2">
               {(appt.status === "Scheduled" || appt.status === "Pending") && (
                 <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                    onClick={() => onStatusChange(appt._id, "Confirmed")}
-                  >
-                    <CheckCircle2 className="w-3 h-3 mr-1" /> Confirm
+                  <Button size="sm" variant="outline" className="h-8 text-emerald-600 border-emerald-200 hover:bg-emerald-50 disabled:opacity-50" disabled={isCardLoading} onClick={() => onStatusChange(appt._id, "Confirmed")}>
+                    {isCardLoading && actionLoading.status === "Confirmed" ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <CheckCircle2 className="w-3 h-3 mr-1" />} Confirm
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 text-red-500 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => onStatusChange(appt._id, "Cancelled")}
-                  >
-                    <XCircle className="w-3 h-3 mr-1" /> Reject
+                  <Button size="sm" variant="ghost" className="h-8 text-red-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50" disabled={isCardLoading} onClick={() => onStatusChange(appt._id, "Cancelled")}>
+                    {isCardLoading && actionLoading.status === "Cancelled" ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <XCircle className="w-3 h-3 mr-1" />} Reject
                   </Button>
                 </>
               )}
-
               {appt.status === "Confirmed" && (
                 <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={onInitiate}>
                   <Activity className="w-3 h-3 mr-2" /> Initiate Encounter
@@ -308,12 +303,8 @@ function AppointmentCard({ appt, onStatusChange, onInitiate, isHistory, onView, 
             <div className="flex gap-2">
               {appt.status === "Completed" && (
                 <>
-                  <Button size="sm" variant="outline" className="h-8" onClick={onView}>
-                    <Eye className="w-3 h-3 mr-1" /> View
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-8" onClick={onEdit}>
-                    <Edit3 className="w-3 h-3 mr-1" /> Edit
-                  </Button>
+                  <Button size="sm" variant="outline" className="h-8" onClick={onView}><Eye className="w-3 h-3 mr-1" /> View</Button>
+                  <Button size="sm" variant="ghost" className="h-8" onClick={onEdit}><Edit3 className="w-3 h-3 mr-1" /> Edit</Button>
                 </>
               )}
             </div>
@@ -333,6 +324,9 @@ function EmptyState({ message }) {
   );
 }
 
+// ============================================================================
+// SUB-COMPONENT: REPORT FORM
+// ============================================================================
 function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isEditMode, initialData }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -353,15 +347,7 @@ function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isE
   const [medicines, setMedicines] = useState(
     initialData?.prescription && initialData.prescription.length > 0
       ? initialData.prescription
-      : [
-          {
-            medicineName: "",
-            dosage: "",
-            frequency: "1-0-1",
-            duration: "5 Days",
-            instructions: "After Food",
-          },
-        ]
+      : [{ medicineName: "", dosage: "", frequency: "1-0-1", duration: "5 Days", instructions: "After Food" }]
   );
 
   const [labFiles, setLabFiles] = useState([]);
@@ -377,10 +363,7 @@ function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isE
   };
 
   const addMed = () =>
-    setMedicines([
-      ...medicines,
-      { medicineName: "", dosage: "", frequency: "", duration: "", instructions: "" },
-    ]);
+    setMedicines([...medicines, { medicineName: "", dosage: "", frequency: "", duration: "", instructions: "" }]);
 
   const removeMed = (idx) => setMedicines(medicines.filter((_, i) => i !== idx));
 
@@ -423,7 +406,9 @@ function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isE
       else await createVisitReport(token, data);
       onSuccess();
     } catch (error) {
-      console.error(error);
+      console.error("REPORT SUBMIT ERROR:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Failed to save report";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -449,13 +434,7 @@ function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isE
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-slate-500">Temp (°F)</Label>
-                <Input
-                  name="temperature"
-                  placeholder="98.6"
-                  value={formData.temperature}
-                  onChange={handleChange}
-                  className="h-9"
-                />
+                <Input name="temperature" placeholder="98.6" value={formData.temperature} onChange={handleChange} className="h-9" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-slate-500">SpO2 (%)</Label>
@@ -463,13 +442,7 @@ function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isE
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-slate-500">Pulse (bpm)</Label>
-                <Input
-                  name="heartRate"
-                  placeholder="72"
-                  value={formData.heartRate}
-                  onChange={handleChange}
-                  className="h-9"
-                />
+                <Input name="heartRate" placeholder="72" value={formData.heartRate} onChange={handleChange} className="h-9" />
               </div>
             </div>
           </div>
@@ -478,27 +451,13 @@ function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isE
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <Label className="text-slate-700">
-                Primary Diagnosis <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                name="diagnosis"
-                value={formData.diagnosis}
-                onChange={handleChange}
-                className="border-blue-200 bg-blue-50/50 font-medium mt-1.5"
-                placeholder="e.g. Acute Bronchitis"
-              />
+              <Label className="text-slate-700">Primary Diagnosis <span className="text-red-500">*</span></Label>
+              <Input name="diagnosis" value={formData.diagnosis} onChange={handleChange} className="border-blue-200 bg-blue-50/50 font-medium mt-1.5" placeholder="e.g. Acute Bronchitis" />
             </div>
 
             <div>
               <Label className="text-slate-700">Presenting Symptoms</Label>
-              <Input
-                name="symptoms"
-                value={formData.symptoms}
-                onChange={handleChange}
-                className="mt-1.5"
-                placeholder="e.g. Cough, Fever"
-              />
+              <Input name="symptoms" value={formData.symptoms} onChange={handleChange} className="mt-1.5" placeholder="e.g. Cough, Fever" />
             </div>
           </div>
 
@@ -509,57 +468,23 @@ function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isE
               <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider flex items-center gap-2">
                 <Paperclip className="w-4 h-4" /> Investigations
               </h3>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current.click()}
-                className="h-8 border-dashed"
-              >
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current.click()} className="h-8 border-dashed">
                 <Plus className="w-3 h-3 mr-2" /> Attach
               </Button>
-
-              <input
-                type="file"
-                multiple
-                ref={fileInputRef}
-                className="hidden"
-                onChange={handleFileChange}
-                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-              />
+              <input type="file" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {isEditMode &&
-                existingLabReports.map((file, idx) => (
-                  <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 bg-slate-100">
-                    <span className="max-w-[150px] truncate text-slate-600">{file.originalName}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-4 w-4 rounded-full hover:bg-red-100 text-slate-400 hover:text-red-500"
-                      onClick={() => removeExistingFile(file.url)}
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                  </Badge>
-                ))}
-
+              {isEditMode && existingLabReports.map((file, idx) => (
+                <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 bg-slate-100">
+                  <span className="max-w-[150px] truncate text-slate-600">{file.originalName}</span>
+                  <Button variant="ghost" size="icon" className="h-4 w-4 rounded-full hover:bg-red-100 text-slate-400 hover:text-red-500" onClick={() => removeExistingFile(file.url)}><X className="w-3 h-3" /></Button>
+                </Badge>
+              ))}
               {labFiles.map((file, idx) => (
-                <Badge
-                  key={`new-${idx}`}
-                  variant="outline"
-                  className="pl-3 pr-1 py-1 flex items-center gap-2 border-blue-200 bg-blue-50 text-blue-700"
-                >
+                <Badge key={`new-${idx}`} variant="outline" className="pl-3 pr-1 py-1 flex items-center gap-2 border-blue-200 bg-blue-50 text-blue-700">
                   <span className="max-w-[150px] truncate">{file.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4 rounded-full hover:bg-blue-100 text-blue-500"
-                    onClick={() => removeNewFile(idx)}
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
+                  <Button variant="ghost" size="icon" className="h-4 w-4 rounded-full hover:bg-blue-100 text-blue-500" onClick={() => removeNewFile(idx)}><X className="w-3 h-3" /></Button>
                 </Badge>
               ))}
             </div>
@@ -570,63 +495,18 @@ function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isE
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <Label className="text-slate-700">Prescription</Label>
-              <Button variant="ghost" size="sm" onClick={addMed} className="text-blue-600 hover:bg-blue-50">
-                <Plus className="w-3 h-3 mr-1" /> Add Drug
-              </Button>
+              <Button variant="ghost" size="sm" onClick={addMed} className="text-blue-600 hover:bg-blue-50"><Plus className="w-3 h-3 mr-1" /> Add Drug</Button>
             </div>
 
             {medicines.map((med, idx) => (
-              <div
-                key={idx}
-                className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded border border-slate-100"
-              >
-                <div className="col-span-4">
-                  <Input
-                    placeholder="Drug Name"
-                    value={med.medicineName}
-                    onChange={(e) => handleMedChange(idx, "medicineName", e.target.value)}
-                    className="h-8 bg-white border-slate-200"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Input
-                    placeholder="Dose"
-                    value={med.dosage}
-                    onChange={(e) => handleMedChange(idx, "dosage", e.target.value)}
-                    className="h-8 bg-white border-slate-200"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Input
-                    placeholder="Freq"
-                    value={med.frequency}
-                    onChange={(e) => handleMedChange(idx, "frequency", e.target.value)}
-                    className="h-8 bg-white border-slate-200"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Input
-                    placeholder="Dur"
-                    value={med.duration}
-                    onChange={(e) => handleMedChange(idx, "duration", e.target.value)}
-                    className="h-8 bg-white border-slate-200"
-                  />
-                </div>
+              <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded border border-slate-100">
+                <div className="col-span-4"><Input placeholder="Drug Name" value={med.medicineName} onChange={(e) => handleMedChange(idx, "medicineName", e.target.value)} className="h-8 bg-white border-slate-200" /></div>
+                <div className="col-span-2"><Input placeholder="Dose" value={med.dosage} onChange={(e) => handleMedChange(idx, "dosage", e.target.value)} className="h-8 bg-white border-slate-200" /></div>
+                <div className="col-span-2"><Input placeholder="Freq" value={med.frequency} onChange={(e) => handleMedChange(idx, "frequency", e.target.value)} className="h-8 bg-white border-slate-200" /></div>
+                <div className="col-span-2"><Input placeholder="Dur" value={med.duration} onChange={(e) => handleMedChange(idx, "duration", e.target.value)} className="h-8 bg-white border-slate-200" /></div>
                 <div className="col-span-2 flex gap-1">
-                  <Input
-                    placeholder="Instr"
-                    value={med.instructions}
-                    onChange={(e) => handleMedChange(idx, "instructions", e.target.value)}
-                    className="h-8 bg-white border-slate-200"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeMed(idx)}
-                    className="h-8 w-8 text-red-400 hover:text-red-600"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  <Input placeholder="Instr" value={med.instructions} onChange={(e) => handleMedChange(idx, "instructions", e.target.value)} className="h-8 bg-white border-slate-200" />
+                  <Button variant="ghost" size="icon" onClick={() => removeMed(idx)} className="h-8 w-8 text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></Button>
                 </div>
               </div>
             ))}
@@ -635,82 +515,47 @@ function CreateDetailedReportForm({ appointment, token, onSuccess, onCancel, isE
           <Separator />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label className="text-slate-700">Private Notes</Label>
-              <Textarea
-                name="doctorNotes"
-                value={formData.doctorNotes}
-                onChange={handleChange}
-                className="bg-yellow-50/30 border-yellow-100 mt-1.5 focus:border-yellow-300"
-                placeholder="Internal use only..."
-              />
-            </div>
-            <div>
-              <Label className="text-slate-700">Patient Advice</Label>
-              <Textarea
-                name="patientAdvice"
-                value={formData.patientAdvice}
-                onChange={handleChange}
-                className="mt-1.5"
-                placeholder="Follow-up instructions..."
-              />
-            </div>
+            <div><Label className="text-slate-700">Private Notes</Label><Textarea name="doctorNotes" value={formData.doctorNotes} onChange={handleChange} className="bg-yellow-50/30 border-yellow-100 mt-1.5 focus:border-yellow-300" placeholder="Internal use only..." /></div>
+            <div><Label className="text-slate-700">Patient Advice</Label><Textarea name="patientAdvice" value={formData.patientAdvice} onChange={handleChange} className="mt-1.5" placeholder="Follow-up instructions..." /></div>
           </div>
         </div>
       </ScrollArea>
 
       <div className="p-4 border-t bg-white shrink-0 flex justify-end gap-3">
-        <Button variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
-        >
-          {loading ? "Processing..." : isEditMode ? "Update Record" : "Finalize"}
-        </Button>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button onClick={handleSubmit} disabled={loading} className="bg-blue-600 hover:bg-blue-700 min-w-[140px]">{loading ? "Processing..." : isEditMode ? "Update Record" : "Finalize"}</Button>
       </div>
     </div>
   );
 }
 
-// ... all your imports remain same ...
-
 // ============================================================================
-// SUB-COMPONENT: VIEW REPORT MODAL (FINAL FIXED)
+// SUB-COMPONENT: VIEW REPORT MODAL
 // ============================================================================
 function ViewReportModal({ data }) {
   const viewFile = (url) => {
-  if (!url) return;
-  window.open(url, "_blank", "noopener,noreferrer");
-};
-
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   const downloadFile = async (url, originalName) => {
-  if (!url) return;
-
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Failed to fetch file");
-
-    const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = originalName || "download";
-    document.body.appendChild(link);
-    link.click();
-
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(blobUrl);
-  } catch (err) {
-    // fallback if browser blocks fetch/download
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-};
-
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch file");
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = originalName || "download";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
 
   return (
     <div className="space-y-8 pb-4">
@@ -822,7 +667,6 @@ function ViewReportModal({ data }) {
                     size="icon"
                     className="h-8 w-8 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded-full"
                     onClick={() => downloadFile(file.url, file.originalName)}
-
                     title="Download"
                   >
                     <Download className="w-4 h-4" />

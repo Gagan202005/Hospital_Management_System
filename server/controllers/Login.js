@@ -89,7 +89,7 @@ exports.login = async (req, res) => {
 exports.getalluserdetails = async (req, res) => {
     try {
         // We get _id from req.user because your auth middleware attaches the full user document
-        const user_id = req.user._id; 
+        const user_id = req.user.id; 
         const accountType = req.user.accountType;
         
         let userProfile = null;
@@ -177,7 +177,7 @@ exports.getalluserdetails = async (req, res) => {
 exports.changePassword = async (req, res) => {
     try {
         const { oldPassword, newPassword, confirmPassword } = req.body;
-        const id = req.user._id; 
+        const id = req.user.id; 
         const accountType = req.user.accountType;
 
         if (!oldPassword || !newPassword || !confirmPassword) {

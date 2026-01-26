@@ -3,7 +3,7 @@ const router = express.Router();
 
 // Middleware Imports
 const { auth, isDoctor } = require("../middlewares/auth");
-
+const {isDemo} = require("../middlewares/isDemo");
 // Controller Imports
 const { 
   createVisitReport, 
@@ -17,10 +17,10 @@ const {
 // ==========================================================================
 
 // Create a new medical visit report (Doctor Only)
-router.post("/create", auth, isDoctor, createVisitReport);
+router.post("/create", auth,isDemo, isDoctor, createVisitReport);
 
 // Update an existing report (Doctor Only)
-router.put("/update", auth, isDoctor, updateVisitReport);
+router.put("/update", auth,isDemo, isDoctor, updateVisitReport);
 
 
 // ==========================================================================

@@ -179,8 +179,8 @@ exports.getGeminiResponse = async (req, res) => {
       });
     }
 
-    // Initialize Model (Flash is faster and cheaper for chat)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // ✅ FIX: Use "gemini-2.0-flash" (Explicitly available in your list)
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // --- SYSTEM CONTEXT & RULES ---
     const systemInstruction = `

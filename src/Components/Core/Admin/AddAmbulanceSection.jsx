@@ -8,6 +8,7 @@ import { Textarea } from "../../ui/textarea";
 import { Badge } from "../../ui/badge";
 import { Truck, Search, Edit, Trash2, Phone, Loader2, X, Save, IndianRupee, Siren, CheckCircle, Activity } from "lucide-react";
 import { useSelector } from "react-redux";
+import { toast } from "react-hot-toast";
 import { Add_Ambulance, GetAll_Ambulances, Delete_Ambulance, Update_Ambulance, Book_Ambulance, Complete_Trip } from "../../../services/operations/AdminApi";
 
 export const AddAmbulanceSection = () => {
@@ -37,8 +38,12 @@ export const AddAmbulanceSection = () => {
     try {
       const response = await GetAll_Ambulances(token);
       if (Array.isArray(response)) setAmbulances(response);
-    } catch (error) { console.error(error); } 
-    finally { setIsFetching(false); }
+    } catch (error) { 
+      console.error(error);
+      // Optional: toast.error("Failed to load fleet data");
+    } finally { 
+      setIsFetching(false); 
+    }
   };
 
   useEffect(() => { fetchAmbulances(); }, [token]);
@@ -55,13 +60,24 @@ export const AddAmbulanceSection = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      if (isEditing) await Update_Ambulance({ ...formData, _id: editId }, token);
-      else await Add_Ambulance(formData, token);
+      if (isEditing) {
+        await Update_Ambulance({ ...formData, _id: editId }, token);
+        toast.success("Vehicle details updated successfully.");
+      } else {
+        await Add_Ambulance(formData, token);
+        toast.success("New vehicle added to fleet.");
+      }
       fetchAmbulances();
       setFormData({ vehicleNumber: "", model: "", year: "", driverName: "", driverLicense: "", driverContact: "", pricePerHour: "" });
-      setIsEditing(false); setEditId(null);
-    } catch (error) { console.error(error); } 
-    finally { setIsLoading(false); }
+      setIsEditing(false); 
+      setEditId(null);
+    } catch (error) { 
+      console.error("SUBMIT ERROR:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Operation failed.";
+      toast.error(errorMessage);
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   const handleEditClick = (amb) => {
@@ -70,16 +86,53 @@ export const AddAmbulanceSection = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = async (id) => { if(window.confirm("Remove vehicle?")) { await Delete_Ambulance(id, token); fetchAmbulances(); } };
-
-  const handleBookingSubmit = async (e) => {
-      e.preventDefault(); setIsLoading(true);
-      const success = await Book_Ambulance({ ...bookingData, ambulanceId: selectedAmbId }, token);
-      if(success) { setIsBookModalOpen(false); fetchAmbulances(); }
-      setIsLoading(false);
+  const handleDelete = async (id) => { 
+    if(window.confirm("Remove vehicle from fleet? This cannot be undone.")) { 
+      try {
+        await Delete_Ambulance(id, token); 
+        toast.success("Vehicle removed successfully.");
+        fetchAmbulances(); 
+      } catch (error) {
+        console.error("DELETE ERROR:", error);
+        const errorMessage = error.response?.data?.message || error.message || "Failed to delete vehicle.";
+        toast.error(errorMessage);
+      }
+    } 
   };
 
-  const handleCompleteTrip = async (id) => { if(window.confirm("Trip completed?")) { await Complete_Trip(id, token); fetchAmbulances(); } };
+  const handleBookingSubmit = async (e) => {
+      e.preventDefault(); 
+      setIsLoading(true);
+      try {
+        const response = await Book_Ambulance({ ...bookingData, ambulanceId: selectedAmbId }, token);
+        
+        toast.success(response?.message || "Ambulance dispatched successfully!");
+        setIsBookModalOpen(false); 
+        fetchAmbulances();
+        setBookingData({ patientIdInput: "", address: "", reason: "" }); // Reset form
+
+      } catch (error) {
+        console.error("BOOKING ERROR:", error);
+        const errorMessage = error.response?.data?.message || error.message || "Dispatch failed.";
+        toast.error(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+  };
+
+  const handleCompleteTrip = async (id) => { 
+    if(window.confirm("Mark trip as completed? Vehicle will become available.")) { 
+      try {
+        await Complete_Trip(id, token); 
+        toast.success("Trip completed. Vehicle is now available.");
+        fetchAmbulances(); 
+      } catch (error) {
+        console.error("COMPLETE TRIP ERROR:", error);
+        const errorMessage = error.response?.data?.message || error.message || "Failed to update status.";
+        toast.error(errorMessage);
+      }
+    } 
+  };
 
   const filtered = useMemo(() => {
       if (!searchQuery) return ambulances;
@@ -137,7 +190,6 @@ export const AddAmbulanceSection = () => {
                                 <p className="text-xs text-slate-500 mt-1">{amb.model} • {amb.driverName} ({amb.driverContact})</p>
                             </div>
                             
-                            {/* --- MODIFIED BUTTONS START --- */}
                             <div className="flex gap-1">
                                 <Button 
                                   variant="ghost" 
@@ -160,7 +212,6 @@ export const AddAmbulanceSection = () => {
                                   <Trash2 className="w-3 h-3"/>
                                 </Button>
                             </div>
-                            {/* --- MODIFIED BUTTONS END --- */}
 
                         </div>
                         <div className="mt-3 pt-3 border-t border-dashed border-slate-200 flex justify-between items-center">

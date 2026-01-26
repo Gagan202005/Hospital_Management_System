@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-
+const {isDemo} = require("../middlewares/isDemo");
 // Middleware Imports
 const { auth } = require("../middlewares/auth");
 
@@ -24,7 +24,7 @@ router.post("/signup", signup);
 router.post("/sendotp", sendotp);
 
 // Route to change password (Requires user to be logged in)
-router.post("/change-password", auth, changePassword);
+router.post("/change-password", auth,isDemo, changePassword);
 
 
 // ==========================================================================

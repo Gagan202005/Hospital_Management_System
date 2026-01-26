@@ -3,7 +3,11 @@ const Appointment = require("../models/Appointment");
 const TimeSlot = require("../models/Slot"); 
 const Patient = require("../models/Patient"); 
 const mailSender = require("../utils/mailSender"); 
+
+// --- Import Templates ---
 const appointmentPendingTemplate = require("../mail/templates/AppointmentPendingMail");
+const { appointmentStatusUpdateEmail } = require("../mail/templates/AppointmentStatusUpdateMail");
+const { appointmentExpiryEmail } = require("../mail/templates/AppointmentExpiryMail");
 
 // Helper to prevent Regex Injection (Server Crash)
 function escapeRegex(text) {
@@ -16,43 +20,22 @@ function escapeRegex(text) {
 exports.updateDoctorProfile = async (req, res) => {
     try {
         const userId = req.user.id;
-        
-        // 1. Destructure all possible fields from frontend
         const {
-            firstName,
-            lastName,
-            phoneno,       
-            address,       
-            dob,
-            age,
-            gender,
-            bloodGroup,
-            department,
-            specialization,
-            qualification, 
-            experience,
-            consultationFee,
-            about
+            firstName, lastName, phoneno, address, dob, age, gender, bloodGroup,
+            department, specialization, qualification, experience, consultationFee, about
         } = req.body;
 
-        // 2. Find Doctor
         const doctor = await Doctor.findById(userId);
-        if (!doctor) {
-            return res.status(404).json({ success: false, message: "Doctor not found" });
-        }
+        if (!doctor) return res.status(404).json({ success: false, message: "Doctor not found" });
 
-        // 3. Update Fields (Only if provided)
         if (firstName) doctor.firstName = firstName;
         if (lastName) doctor.lastName = lastName;
-        
         if (phoneno) doctor.phoneno = phoneno;
         if (address) doctor.address = address;
-
         if (dob) doctor.dob = dob;
         if (age) doctor.age = age;
         if (gender) doctor.gender = gender;
         if (bloodGroup) doctor.bloodGroup = bloodGroup;
-
         if (department) doctor.department = department;
         if (specialization) doctor.specialization = specialization;
         if (qualification) doctor.qualification = qualification;
@@ -60,309 +43,155 @@ exports.updateDoctorProfile = async (req, res) => {
         if (consultationFee) doctor.consultationFee = consultationFee;
         if (about) doctor.about = about;
 
-        // 4. Save Updates
         await doctor.save();
 
-        return res.status(200).json({
-            success: true,
-            message: "Profile updated successfully",
-            data: doctor,
-        });
+        return res.status(200).json({ success: true, message: "Profile updated", data: doctor });
 
     } catch (error) {
-        console.error("Update Doctor Profile Error:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Failed to update profile",
-            error: error.message
-        });
+        console.error("Update Profile Error:", error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
-
 // =================================================================
-// 2. TIME SLOT MANAGEMENT (Doctor Dashboard)
+// 2. TIME SLOT MANAGEMENT
 // =================================================================
 
-// --- CREATE TIME SLOT ---
 exports.createTimeSlot = async (req, res) => {
   try {
     const { date, startTime, endTime } = req.body;
     const doctorId = req.user.id; 
 
     if (!date || !startTime || !endTime) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields (date, startTime, endTime) are required",
-      });
+      return res.status(400).json({ success: false, message: "Fields missing" });
     }
 
-    const newSlot = await TimeSlot.create({
-      doctorId,
-      date,
-      startTime,
-      endTime,
-      isBooked: false,
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Time slot created successfully",
-      data: newSlot,
-    });
+    const newSlot = await TimeSlot.create({ doctorId, date, startTime, endTime, isBooked: false });
+    return res.status(200).json({ success: true, message: "Slot created", data: newSlot });
 
   } catch (error) {
-    console.error("CREATE_SLOT_ERROR:", error);
-    // Handle specific overlap error from Schema validation
-    if (error.message.includes("overlaps")) {
-      return res.status(409).json({ 
-        success: false,
-        message: "This time slot overlaps with an existing slot.",
-      });
-    }
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create time slot",
-      error: error.message,
-    });
+    if (error.message.includes("overlaps")) return res.status(409).json({ success: false, message: "Slot overlaps" });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// --- GET TIME SLOTS ---
 exports.getTimeSlots = async (req, res) => {
   try {
-    const doctorId = req.user.id; 
-
-    const slots = await TimeSlot.find({ doctorId })
-      .sort({ date: 1, startTime: 1 });
-
-    return res.status(200).json({
-      success: true,
-      data: slots,
-    });
-
+    const slots = await TimeSlot.find({ doctorId: req.user.id }).sort({ date: 1, startTime: 1 });
+    return res.status(200).json({ success: true, data: slots });
   } catch (error) {
-    console.error("GET_SLOTS_ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch time slots",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-
 // =================================================================
-// 3. PUBLIC SEARCH & DETAILS (Patient View)
+// 3. PUBLIC SEARCH & DETAILS
 // =================================================================
 
 exports.getPublicDoctors = async (req, res) => {
   try {
     const { searchQuery, specialty } = req.query;
+    let query = { status: "Active", active: true };
 
-    let query = { 
-      status: "Active", 
-      active: true 
-    };
-
-    // 1. Handle Search Text (SECURE FIX: Escape Regex)
     if (searchQuery) {
-      const safeSearch = escapeRegex(searchQuery); // Prevents Server Crash
+      const safeSearch = escapeRegex(searchQuery);
       const regex = new RegExp(safeSearch, "i");
-      query.$or = [
-        { firstName: regex },
-        { lastName: regex },
-        { specialization: regex },
-        { department: regex }
-      ];
+      query.$or = [{ firstName: regex }, { lastName: regex }, { specialization: regex }, { department: regex }];
     }
 
-    // 2. Handle Specialty Filter
-    if (specialty && specialty !== "All specialties") {
-      query.specialization = specialty;
-    }
+    if (specialty && specialty !== "All specialties") query.specialization = specialty;
 
-    // 3. Fetch Doctors
     let doctors = await Doctor.find(query)
       .select("firstName lastName specialization image experience qualification phoneno consultationFee doctorID rating")
       .lean();
 
-    // 4. Sort by Experience (Highest First)
-    doctors.sort((a, b) => {
-      const expA = parseInt(a.experience) || 0;
-      const expB = parseInt(b.experience) || 0;
-      return expB - expA;
-    });
+    doctors.sort((a, b) => (parseInt(b.experience) || 0) - (parseInt(a.experience) || 0));
 
-    // 5. Initial View Limit
-    if (!searchQuery && (!specialty || specialty === "All specialties")) {
-      doctors = doctors.slice(0, 8);
-    }
+    if (!searchQuery && (!specialty || specialty === "All specialties")) doctors = doctors.slice(0, 8);
 
-    return res.status(200).json({
-      success: true,
-      count: doctors.length,
-      data: doctors,
-    });
+    return res.status(200).json({ success: true, count: doctors.length, data: doctors });
 
   } catch (error) {
-    console.error("GET_PUBLIC_DOCTORS_ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch doctors",
-    });
+    return res.status(500).json({ success: false, message: "Fetch failed" });
   }
 };
 
 exports.getDoctorDetails = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const doctor = await Doctor.findById(id)
-      .select("-password -token -resetPasswordExpires")
-      .lean();
-
-    if (!doctor) {
-      return res.status(404).json({
-        success: false,
-        message: "Doctor not found",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: doctor,
-    });
-
+    const doctor = await Doctor.findById(req.params.id).select("-password -token -resetPasswordExpires").lean();
+    if (!doctor) return res.status(404).json({ success: false, message: "Not found" });
+    return res.status(200).json({ success: true, data: doctor });
   } catch (error) {
-    console.error("GET_DOCTOR_DETAILS_ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Invalid Doctor ID format",
-    });
+    return res.status(500).json({ success: false, message: "Invalid ID" });
   }
 };
 
-
 // =================================================================
-// 4. APPOINTMENT BOOKING (Slot Based)
+// 4. APPOINTMENT BOOKING
 // =================================================================
 
-// --- Get Available Slots (Public/Patient) ---
 exports.getAvailableSlots = async (req, res) => {
   try {
     const { doctorId } = req.params;
     const { date } = req.query; 
 
-    if (!date || !doctorId) {
-      return res.status(400).json({ success: false, message: "Date and Doctor ID required" });
-    }
+    if (!date || !doctorId) return res.status(400).json({ success: false });
 
     const queryDate = new Date(date);
     queryDate.setUTCHours(0, 0, 0, 0);
 
-    const availableSlots = await TimeSlot.find({
-      doctorId: doctorId,
-      date: queryDate,
-      isBooked: false 
-    })
-    .sort({ startTime: 1 })
-    .select("startTime _id");
+    const availableSlots = await TimeSlot.find({ doctorId, date: queryDate, isBooked: false })
+    .sort({ startTime: 1 }).select("startTime endTime _id");
 
-    return res.status(200).json({
-      success: true,
-      data: availableSlots
-    });
-
+    return res.status(200).json({ success: true, data: availableSlots });
   } catch (error) {
-    console.error("GET_SLOTS_ERROR:", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch slots" });
+    return res.status(500).json({ success: false, message: "Failed" });
   }
 };
 
 exports.bookAppointment = async (req, res) => {
   try {
-    const { 
-      doctorId, date, timeSlotId, 
-      firstName, lastName, email, phone, reason, symptoms 
-    } = req.body;
+    const { doctorId, date, timeSlotId, firstName, lastName, email, phone, reason, symptoms } = req.body;
 
-    // 1. Strict Auth Check
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ success: false, message: "Please login to book an appointment." });
-    }
+    if (!req.user || !req.user.id) return res.status(401).json({ success: false, message: "Login required" });
     const patientId = req.user.id;
 
-    // 2. ATOMIC LOCK (Prevents Double Booking)
+    // ATOMIC LOCK
     const slotDoc = await TimeSlot.findOneAndUpdate(
-        { _id: timeSlotId, isBooked: false },
-        { isBooked: true },
-        { new: true }
+        { _id: timeSlotId, isBooked: false }, { isBooked: true }, { new: true }
     );
 
-    if (!slotDoc) {
-      return res.status(400).json({ 
-          success: false, 
-          message: "This slot has just been booked by another user. Please choose another." 
-      });
-    }
+    if (!slotDoc) return res.status(400).json({ success: false, message: "Slot unavailable" });
 
-    // 3. Create Appointment (Status: Pending)
     const newAppointment = await Appointment.create({
-      doctor: doctorId,
-      patient: patientId,
+      doctor: doctorId, patient: patientId,
       patientDetails: { firstName, lastName, email, phone },
-      date: slotDoc.date,
-      timeSlotId: slotDoc._id,
-      timeSlot: slotDoc.startTime,
-      reason,
-      symptoms,
-      status: "Pending"
+      date: slotDoc.date, timeSlotId: slotDoc._id, timeSlot: `${slotDoc.startTime} - ${slotDoc.endTime}`,
+      reason, symptoms, status: "Pending"
     });
 
-    // 4. Link Appointment ID back to Slot
-    slotDoc.appointmentId = newAppointment._id;
-    await slotDoc.save();
+    slotDoc.appointmentId = newAppointment._id; await slotDoc.save();
 
-    // 5. Send Email Notification
+    // Email
     try {
-      // NEW: Fetch Doctor details specifically for the email
       const doctorDetails = await Doctor.findById(doctorId).select("firstName lastName department");
-
       const emailContent = appointmentPendingTemplate(
-          firstName, 
-          slotDoc.date,      
-          slotDoc.startTime, 
-          reason,
-          // NEW: Pass Doctor Data
-          `${doctorDetails.firstName} ${doctorDetails.lastName}`, 
-          doctorDetails.department
+          firstName, slotDoc.date, slotDoc.startTime, reason,
+          `${doctorDetails.firstName} ${doctorDetails.lastName}`, doctorDetails.department
       );
-      
-      await mailSender(
-          email, 
-          "Appointment Request Pending | MediCare", 
-          emailContent
-      );
-    } catch (mailError) {
-      console.error("Email sending failed:", mailError);
-    }
+      await mailSender(email, "Request Pending | MediCare", emailContent);
+    } catch (e) { console.error("Mail Fail:", e); }
 
-    return res.status(200).json({
-      success: true,
-      message: "Appointment request sent successfully",
-      data: newAppointment
-    });
+    return res.status(200).json({ success: true, message: "Requested", data: newAppointment });
 
   } catch (error) {
-    console.error("BOOK_APPOINTMENT_ERROR:", error);
-    return res.status(500).json({ success: false, message: "Internal Server Error" });
+    console.error("Booking Error:", error);
+    return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
 
-
 // =================================================================
-// 6. GET DOCTOR PATIENTS
+// 6. PATIENT & SCHEDULE MANAGEMENT
 // =================================================================
 
 exports.getDoctorPatients = async (req, res) => {
@@ -370,45 +199,25 @@ exports.getDoctorPatients = async (req, res) => {
     const doctorId = req.user.id;
     const now = new Date();
 
-    // 1. POPULATE PATIENT: Fetches the live profile data (Address, Blood Group, etc.)
-    const appointments = await Appointment.find({ doctor: doctorId })
-      .populate("patient") // <--- This is the key fix
-      .sort({ date: -1 });
-
+    const appointments = await Appointment.find({ doctor: doctorId }).populate("patient").sort({ date: -1 });
     const patientMap = new Map();
 
     appointments.forEach((appt) => {
-      // Use the Live Profile email if available, otherwise fallback to the snapshot
-      // (This handles cases where a user might have deleted their account but the appointment remains)
       const email = appt.patient ? appt.patient.email : appt.patientDetails.email;
 
       if (!patientMap.has(email)) {
-        
-        // Define sources for data
         const profile = appt.patient || {};
         const snapshot = appt.patientDetails || {};
 
         patientMap.set(email, {
           id: appt._id, 
-          
-          // Name: Prefer Live Profile -> Fallback to Snapshot
-          name: profile.firstName 
-            ? `${profile.firstName} ${profile.lastName}` 
-            : `${snapshot.firstName} ${snapshot.lastName}`,
-            
+          name: profile.firstName ? `${profile.firstName} ${profile.lastName}` : `${snapshot.firstName} ${snapshot.lastName}`,
           email: email,
           phone: profile.phoneno || snapshot.phone || "N/A",
-          
-          // --- FULL DETAILS NOW AVAILABLE ---
           gender: profile.gender || "Not specified",
           bloodGroup: profile.bloodGroup || "Not specified",
           address: profile.address || "No address on file",
-          
-          visitCount: 0,
-          lastVisit: null,
-          nextVisit: null,
-          status: "Inactive",
-          history: []
+          visitCount: 0, lastVisit: null, nextVisit: null, status: "Inactive", history: []
         });
       }
 
@@ -416,147 +225,87 @@ exports.getDoctorPatients = async (req, res) => {
       patient.visitCount += 1;
       const apptDate = new Date(appt.date);
 
-      // --- DATE LOGIC ---
-      // Future: Confirmed or Pending appointments count as "Next Visit"
       if (apptDate > now && (appt.status === "Confirmed" || appt.status === "Pending")) {
           patient.status = "Active"; 
-          // Find the earliest upcoming date
-          if (!patient.nextVisit || apptDate < new Date(patient.nextVisit)) {
-             patient.nextVisit = appt.date;
-          }
+          if (!patient.nextVisit || apptDate < new Date(patient.nextVisit)) patient.nextVisit = appt.date;
       } else {
-          // Past: Only Completed appointments count as "Last Visit"
-          // (We ignore Cancelled here so "Last Visit" means last actual consultation)
-          if (!patient.lastVisit && appt.status === "Completed") {
-              patient.lastVisit = appt.date;
-          }
+          if (!patient.lastVisit && appt.status === "Completed") patient.lastVisit = appt.date;
       }
 
-      // Add to full history list (Includes Cancelled)
-      patient.history.push({
-        date: appt.date,
-        reason: appt.reason,
-        status: appt.status
-      });
+      patient.history.push({ date: appt.date, reason: appt.reason, status: appt.status });
     });
 
-    return res.status(200).json({
-      success: true,
-      data: Array.from(patientMap.values()),
-    });
+    return res.status(200).json({ success: true, data: Array.from(patientMap.values()) });
 
   } catch (error) {
-    console.error("GET_PATIENTS_ERROR:", error);
     return res.status(500).json({ success: false, message: "Error fetching patients" });
   }
 };
 
-// =================================================================
-// 6. APPOINTMENT SCHEDULE
-// =================================================================
 exports.getDoctorAppointments = async (req, res) => {
   try {
-    const doctorId = req.user.id; 
-
-    const appointments = await Appointment.find({ doctor: doctorId })
-      .sort({ date: 1 }) 
-      .lean(); 
-
-    return res.status(200).json({
-      success: true,
-      count: appointments.length,
-      data: appointments,
-    });
-
+    const appointments = await Appointment.find({ doctor: req.user.id }).sort({ date: 1 }).lean(); 
+    return res.status(200).json({ success: true, count: appointments.length, data: appointments });
   } catch (error) {
-    console.error("GET_APPOINTMENTS_ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch appointment schedule",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-
 // =================================================================
-// 7. UPDATE APPOINTMENT STATUS
+// 7. UPDATE STATUS & SEND EMAIL
 // =================================================================
 exports.updateAppointmentStatus = async (req, res) => {
   try {
     const { appointmentId, status } = req.body; 
+    const doctorId = req.user.id;
 
     const appointment = await Appointment.findById(appointmentId).populate("patient"); 
-    if (!appointment) {
-      return res.status(404).json({ success: false, message: "Appointment not found" });
-    }
+    if (!appointment) return res.status(404).json({ success: false, message: "Not found" });
 
     appointment.status = status;
     await appointment.save();
 
-    // If Cancelled, Free up TimeSlot
+    // Logic: Free up slot if Cancelled
     if (status === "Cancelled" && appointment.timeSlotId) {
-       await TimeSlot.findByIdAndUpdate(appointment.timeSlotId, { 
-           isBooked: false, 
-           appointmentId: null 
-       });
+       await TimeSlot.findByIdAndUpdate(appointment.timeSlotId, { isBooked: false, appointmentId: null });
        appointment.timeSlotId = null;
     }
 
+    // Send Detailed Status Email
     if (appointment.patientDetails?.email) {
         try {
-            let subject = `Appointment Status Update: ${status}`;
-            let body = `<p>Your appointment status has changed to: <strong>${status}</strong>.</p>`;
-            await mailSender(appointment.patientDetails.email, subject, body);
-        } catch (mailError) {
-            console.error("Mail Error:", mailError);
-        }
+            const doctor = await Doctor.findById(doctorId).select("firstName lastName");
+            const emailContent = appointmentStatusUpdateEmail(
+                appointment.patientDetails.firstName,
+                appointment.date,
+                appointment.timeSlot, // e.g. "10:00 AM"
+                status,
+                `${doctor.firstName} ${doctor.lastName}`
+            );
+            await mailSender(appointment.patientDetails.email, `Appointment ${status}`, emailContent);
+        } catch (e) { console.error("Mail Fail:", e); }
     }
 
-    return res.status(200).json({
-      success: true,
-      message: `Appointment marked as ${status}`,
-      data: appointment,
-    });
+    return res.status(200).json({ success: true, message: `Marked as ${status}`, data: appointment });
 
   } catch (error) {
-    console.error("UPDATE_STATUS_ERROR:", error);
-    return res.status(500).json({ success: false, message: "Failed to update status" });
+    return res.status(500).json({ success: false, message: "Update failed" });
   }
 };
 
-
-// =================================================================
-// 8. DELETE TIME SLOT
-// =================================================================
 exports.deleteTimeSlot = async (req, res) => {
     try {
         const { slotId } = req.body;
-
         const slot = await TimeSlot.findById(slotId);
-        if (!slot) {
-            return res.status(404).json({ success: false, message: "Slot not found" });
-        }
-
-        if (slot.isBooked) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Cannot delete a slot that is Booked or Pending." 
-            });
-        }
-
+        if (!slot) return res.status(404).json({ success: false });
+        if (slot.isBooked) return res.status(400).json({ success: false, message: "Slot booked" });
         await TimeSlot.findByIdAndDelete(slotId);
-
-        return res.status(200).json({ success: true, message: "Time slot deleted successfully" });
-
-    } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
-    }
+        return res.status(200).json({ success: true, message: "Deleted" });
+    } catch (error) { return res.status(500).json({ success: false }); }
 };
 
-
 // =================================================================
-// 9. DASHBOARD STATS (Fixed Populate)
+// 9. DASHBOARD STATS (Auto-Cancel & Stats)
 // =================================================================
 exports.getDoctorDashboardStats = async (req, res) => {
   try {
@@ -565,58 +314,46 @@ exports.getDoctorDashboardStats = async (req, res) => {
 
     const doctor = await Doctor.findById(doctorId).select("firstName lastName");
 
-    // --- AUTO-CANCEL EXPIRED PENDING APPOINTMENTS ---
+    // --- AUTO-CANCEL EXPIRED ---
     const expiredAppointments = await Appointment.find({
       doctor: doctorId,
       status: "Pending",
       date: { $lt: currentMoment }
     }); 
-    // FIX: Removed invalid .populate("patientDetails") since it is an embedded object
 
     if (expiredAppointments.length > 0) {
       for (const appt of expiredAppointments) {
         appt.status = "Cancelled";
         await appt.save();
 
+        // Send Expiry Email
         if (appt.patientDetails?.email) {
           try {
-            await mailSender(
-              appt.patientDetails.email,
-              "Appointment Cancelled - No Show / Expired",
-              `<p>Your pending appointment for ${new Date(appt.date).toDateString()} has expired.</p>`
+            const emailContent = appointmentExpiryEmail(
+                appt.patientDetails.firstName,
+                appt.date,
+                `${doctor.firstName} ${doctor.lastName}`
             );
+            await mailSender(appt.patientDetails.email, "Appointment Request Expired", emailContent);
           } catch (e) { console.error("Mail fail", e); }
         }
       }
     }
 
     // --- STATS ---
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
 
     const todayAppointmentsCount = await Appointment.countDocuments({
-      doctor: doctorId,
-      date: { $gte: startOfDay, $lte: endOfDay },
-      status: { $ne: "Cancelled" }
+      doctor: doctorId, date: { $gte: startOfDay, $lte: endOfDay }, status: { $ne: "Cancelled" }
     });
 
     const uniquePatients = await Appointment.distinct("patient", { doctor: doctorId });
-    
-    const totalCompletedCount = await Appointment.countDocuments({
-      doctor: doctorId,
-      status: "Completed"
-    });
+    const totalCompletedCount = await Appointment.countDocuments({ doctor: doctorId, status: "Completed" });
 
     const recentAppointments = await Appointment.find({
-        doctor: doctorId,
-        status: { $in: ["Pending", "Confirmed"] },
-        date: { $gte: currentMoment }
-    })
-    .sort({ date: 1, timeSlot: 1 })
-    .limit(3);
-    // FIX: Removed invalid .populate("patientDetails")
+        doctor: doctorId, status: { $in: ["Pending", "Confirmed"] }, date: { $gte: currentMoment }
+    }).sort({ date: 1, timeSlot: 1 }).limit(3);
 
     return res.status(200).json({
       success: true,
@@ -631,6 +368,6 @@ exports.getDoctorDashboardStats = async (req, res) => {
 
   } catch (error) {
     console.error("DASHBOARD_STATS_ERROR", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch dashboard stats" });
+    return res.status(500).json({ success: false, message: "Stats failed" });
   }
 };

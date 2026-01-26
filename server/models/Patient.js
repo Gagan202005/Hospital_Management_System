@@ -50,7 +50,7 @@ const patientSchema = new mongoose.Schema(
         gender: {
             type: String,
             default: "Not specified",
-            enum: ["Male", "Female", "Other", "Prefer not to say", "Not specified"]
+            enum: ["male", "female", "other", "Not specified"]
         },
         bloodGroup: { // Standardized to camelCase
             type: String,

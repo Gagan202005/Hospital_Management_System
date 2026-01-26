@@ -38,7 +38,10 @@ export function TimeSlotManager() {
           }));
           setTimeSlots(formatted);
         }
-      } catch (error) { console.error(error); } 
+      } catch (error) { 
+          console.error("FETCH SLOTS ERROR:", error);
+          // Optional: toast({ title: "Error", description: "Failed to load schedule.", variant: "destructive" });
+      } 
       finally { setIsLoading(false); }
     };
     loadData();
@@ -63,13 +66,28 @@ export function TimeSlotManager() {
         setStartTime(""); setEndTime("");
         toast({ title: "Success", description: "Time slot added." });
       }
-    } catch (error) { console.error(error); } 
+    } catch (error) { 
+        console.error("ADD SLOT ERROR:", error);
+        // >>> UPDATED: Show backend error message <<<
+        const errorMessage = error.response?.data?.message || error.message || "Failed to add slot.";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    } 
     finally { setIsSubmitting(false); }
   };
 
   const handleRemoveSlot = async (id) => {
-    const success = await deleteTimeSlot(id, token);
-    if (success) setTimeSlots(prev => prev.filter(slot => slot.id !== id));
+    try {
+        const success = await deleteTimeSlot(id, token);
+        if (success) {
+            setTimeSlots(prev => prev.filter(slot => slot.id !== id));
+            toast({ title: "Success", description: "Slot removed." });
+        }
+    } catch (error) {
+        console.error("DELETE SLOT ERROR:", error);
+        // >>> UPDATED: Show backend error message <<<
+        const errorMessage = error.response?.data?.message || error.message || "Failed to delete slot.";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    }
   };
 
   const getCurrentDaySlots = () => {
