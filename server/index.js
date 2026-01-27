@@ -21,10 +21,10 @@ const DoctorRoutes = require("./routes/Doctor_routes");
 const AdminRoutes = require("./routes/Admin_routes");
 const medicalRecordRoutes = require("./routes/Report_routes");
 
-
 // =================================================================
 // CONFIGURATION
 // =================================================================
+
 // Load environment variables
 dotenv.config();
 
@@ -33,34 +33,36 @@ const PORT = process.env.PORT || 5000;
 // Connect to MongoDB
 database.connect();
 
-// Connect to Cloudinary (for image uploads)
+// Connect to Cloudinary
 cloudinaryconnect();
 
+// =================================================================
+// MIDDLEWARE (ORDER MATTERS)
+// =================================================================
 
-// =================================================================
-// MIDDLEWARE
-// =================================================================
 // Parse JSON bodies
 app.use(express.json());
 
-// Parse Cookies
+// Parse cookies
 app.use(cookieParser());
 
-// CORS Configuration (Cross-Origin Resource Sharing)
-// Allows frontend at specific URLs to talk to this backend
-const whitelist = process.env.CORS_ORIGIN
-  ? JSON.parse(process.env.CORS_ORIGIN) // e.g., ["http://localhost:3000"]
-  : ["*"]; // Fallback (Not recommended for production)
+// ✅ CORS CONFIGURATION (FIXED & SAFE)
+const allowedOrigin = process.env.CORS_ORIGIN || "*";
 
 app.use(
   cors({
-    origin: whitelist, 
-    credentials: true, // Allow cookies to be sent
-    maxAge: 14400, // Cache preflight response for 4 hours
+    origin: allowedOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 14400, // cache preflight for 4 hours
   })
 );
 
-// File Upload Middleware
+// Handle preflight requests
+app.options("*", cors());
+
+// File upload middleware
 app.use(
   fileUpload({
     useTempFiles: true,
@@ -68,24 +70,21 @@ app.use(
   })
 );
 
-
 // =================================================================
 // API ROUTES
 // =================================================================
-// Base URL: http://localhost:5000/api/v1/...
 
-app.use("/api/v1/auth", AuthRoutes);           // Login, Signup, OTP
-app.use("/api/v1/Patient", PatientRoutes);     // Patient Profile & Ops
-app.use("/api/v1/Doctor", DoctorRoutes);       // Doctor Profile & Ops
-app.use("/api/v1/Admin", AdminRoutes);         // Admin Dashboard Ops
-app.use("/api/v1/medical-record", medicalRecordRoutes); // Clinical Records
-
+app.use("/api/v1/auth", AuthRoutes);
+app.use("/api/v1/Patient", PatientRoutes);
+app.use("/api/v1/Doctor", DoctorRoutes);
+app.use("/api/v1/Admin", AdminRoutes);
+app.use("/api/v1/medical-record", medicalRecordRoutes);
 
 // =================================================================
 // ROOT & SERVER START
 // =================================================================
 
-// Default Route (Health Check)
+// Health check
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -93,7 +92,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// Start the Server
+// Start server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
