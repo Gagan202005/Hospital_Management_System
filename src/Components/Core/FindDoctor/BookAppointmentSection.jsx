@@ -116,7 +116,16 @@ const BookAppointment = () => {
             timeSlotId: selectedSlotId, 
             ...formData 
         };
+        
         await bookAppointmentApi(payload, token, navigate);
+        
+        // Success Toast
+        toast({ 
+            title: "Success", 
+            description: "Appointment request sent successfully!", 
+            className: "bg-green-600 text-white border-none" 
+        });
+
     } catch (error) {
         console.error("BOOKING ERROR:", error);
         const errorMessage = error.response?.data?.message || "Booking failed. Please try again.";

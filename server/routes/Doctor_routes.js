@@ -65,7 +65,7 @@ router.get("/patients", auth, isDoctor, getDoctorPatients);
 router.get("/appointments", auth, isDoctor, getDoctorAppointments);
 
 // Update appointment status (e.g., Pending -> Confirmed/Completed)
-router.post("/update-status", auth,isDemo, isDoctor, updateAppointmentStatus);
+router.post("/update-status", auth, isDoctor, updateAppointmentStatus);
 
 
 // ==========================================================================

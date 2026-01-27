@@ -8,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "../../ui/badge";
 import { toast } from "react-hot-toast"; 
 import { 
-  UserPlus, Search, Edit, Trash2, Loader2, Copy, Save, X, 
-  Users, Activity, CalendarDays, FileText 
+  UserPlus, Search, Edit, Trash2, Loader2, Copy, X, 
+  Users, Activity, CalendarDays 
 } from "lucide-react";
 import { Add_Patient, getAllUsers, Update_Patient, Delete_Patient } from "../../../services/operations/AdminApi";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 
 export const AddPatientSection = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -40,7 +40,6 @@ export const AddPatientSection = () => {
       if (result) setPatients(result);
     } catch (error) { 
         console.error("FETCH ERROR:", error);
-        // Display backend error even for fetching list
         const errorMessage = error.response?.data?.message || error.message || "Failed to load patient list.";
         toast.error(errorMessage);
     } finally { 
@@ -80,12 +79,26 @@ export const AddPatientSection = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // >>> MANUAL VALIDATION CHECK (Enforces required fields for both Add & Edit) <<<
+    if (
+        !formData.firstName.trim() || 
+        !formData.lastName.trim() || 
+        !formData.dob || 
+        !formData.gender || 
+        !formData.email.trim() || 
+        !formData.phoneno.trim() || 
+        !formData.address.trim()
+    ) {
+        toast.error("Please fill in all required fields (*)");
+        return;
+    }
+
     setIsLoading(true);
     try {
       if (isEditing) {
         // --- UPDATE OPERATION ---
         const response = await Update_Patient({ ...formData, _id: editId }, token);
-        // You can also use response.message here if your API returns it on success
         toast.success(response?.message || "Patient record updated successfully.");
       } else {
         // --- ADD OPERATION ---
@@ -111,7 +124,6 @@ export const AddPatientSection = () => {
       resetForm();
     } catch (error) { 
         console.error("SUBMIT ERROR:", error);
-        // >>> UPDATED LOGIC TO ALWAYS SHOW BACKEND MESSAGE <<<
         const errorMessage = error.response?.data?.message || error.message || "Operation failed.";
         toast.error(errorMessage);
     } finally { 
@@ -122,13 +134,23 @@ export const AddPatientSection = () => {
   const handleEditClick = (patient) => {
     setIsEditing(true);
     setEditId(patient._id);
+    
+    // 1. Handle Date (Format to YYYY-MM-DD)
+    const dateValue = patient.DOB || patient.dob;
+    
+    // 2. Handle Gender (Convert to lowercase to match SelectItem values)
+    const genderValue = patient.gender ? patient.gender.toLowerCase() : "";
+
     setFormData({
-      firstName: patient.firstName || "", lastName: patient.lastName || "",
-      email: patient.email || "", gender: patient.gender || "",
-      phoneno: patient.phoneno || "", address: patient.address || "",
+      firstName: patient.firstName || "", 
+      lastName: patient.lastName || "",
+      email: patient.email || "", 
+      gender: genderValue, 
+      phoneno: patient.phoneno || "", 
+      address: patient.address || "",
       emergencyContactName: patient.emergencyContactName || "",
       emergencyContactPhone: patient.emergencyContactPhone || "",
-      dob: patient.DOB ? new Date(patient.DOB).toISOString().split('T')[0] : "",
+      dob: dateValue ? new Date(dateValue).toISOString().split('T')[0] : "",
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -141,7 +163,6 @@ export const AddPatientSection = () => {
           fetchPatients();
       } catch (error) {
           console.error("DELETE ERROR:", error);
-          // >>> UPDATED LOGIC TO ALWAYS SHOW BACKEND MESSAGE <<<
           const errorMessage = error.response?.data?.message || error.message || "Failed to delete patient.";
           toast.error(errorMessage);
       }
@@ -201,24 +222,46 @@ export const AddPatientSection = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>First Name</Label><Input id="firstName" value={formData.firstName} onChange={handleInputChange} required /></div>
-                <div className="space-y-2"><Label>Last Name</Label><Input id="lastName" value={formData.lastName} onChange={handleInputChange} required /></div>
+                <div className="space-y-2">
+                    <Label>First Name <span className="text-red-500">*</span></Label>
+                    <Input id="firstName" value={formData.firstName} onChange={handleInputChange} required />
+                </div>
+                <div className="space-y-2">
+                    <Label>Last Name <span className="text-red-500">*</span></Label>
+                    <Input id="lastName" value={formData.lastName} onChange={handleInputChange} required />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Date of Birth</Label><Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} required /></div>
                 <div className="space-y-2">
-                  <Label>Gender</Label>
-                  <Select onValueChange={(val) => setFormData(prev => ({...prev, gender: val}))} value={formData.gender}>
+                    <Label>Date of Birth <span className="text-red-500">*</span></Label>
+                    <Input id="dob" type="date" value={formData.dob} onChange={handleInputChange} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Gender <span className="text-red-500">*</span></Label>
+                  <Select onValueChange={(val) => setFormData(prev => ({...prev, gender: val}))} value={formData.gender} required>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent><SelectItem value="male">Male</SelectItem><SelectItem value="female">Female</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent>
+                    <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Email</Label><Input id="email" type="email" value={formData.email} onChange={handleInputChange} required /></div>
-                <div className="space-y-2"><Label>Phone</Label><Input id="phoneno" value={formData.phoneno} onChange={handleInputChange} required /></div>
+                <div className="space-y-2">
+                    <Label>Email <span className="text-red-500">*</span></Label>
+                    <Input id="email" type="email" value={formData.email} onChange={handleInputChange} required />
+                </div>
+                <div className="space-y-2">
+                    <Label>Phone <span className="text-red-500">*</span></Label>
+                    <Input id="phoneno" value={formData.phoneno} onChange={handleInputChange} required />
+                </div>
               </div>
-              <div className="space-y-2"><Label>Address</Label><Textarea id="address" value={formData.address} onChange={handleInputChange} className="min-h-[80px]" /></div>
+              <div className="space-y-2">
+                  <Label>Address <span className="text-red-500">*</span></Label>
+                  <Textarea id="address" value={formData.address} onChange={handleInputChange} className="min-h-[80px]" required />
+              </div>
               
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <Label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Emergency Contact</Label>

@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-// Removed Navbar import
 import { Button } from "../Components/ui/button";
 import { Input } from "../Components/ui/input";
 import { Card } from "../Components/ui/card";
@@ -38,7 +37,10 @@ const AiChat = () => {
       const botMessage = { role: "bot", content: aiText };
       setMessages((prev) => [...prev, botMessage]);
     } catch (error) {
-      setMessages((prev) => [...prev, { role: "bot", content: "Sorry, I can't connect right now." }]);
+      console.error("AI CHAT ERROR:", error);
+      // >>> UPDATED: Show specific backend error message in chat <<<
+      const errorMessage = error.response?.data?.message || error.message || "Sorry, I am unable to process your request right now.";
+      setMessages((prev) => [...prev, { role: "bot", content: errorMessage }]);
     } finally {
       setLoading(false);
     }

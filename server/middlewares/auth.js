@@ -4,7 +4,6 @@ require("dotenv").config();
 //authentication
 
 exports.auth = async (req,res,next) =>{
-    console.log(req);
     try{
     const token = req.header("Authorization").replace("Bearer ", "") || req.body.token || req.cookies.token ;
 

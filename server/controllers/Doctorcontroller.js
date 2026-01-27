@@ -153,43 +153,79 @@ exports.bookAppointment = async (req, res) => {
   try {
     const { doctorId, date, timeSlotId, firstName, lastName, email, phone, reason, symptoms } = req.body;
 
-    if (!req.user || !req.user.id) return res.status(401).json({ success: false, message: "Login required" });
+    // 1. Validation
+    if (!req.user || !req.user.id) {
+        return res.status(401).json({ success: false, message: "Login required" });
+    }
     const patientId = req.user.id;
 
-    // ATOMIC LOCK
+    // 2. ATOMIC LOCK: Find slot and mark as booked
     const slotDoc = await TimeSlot.findOneAndUpdate(
-        { _id: timeSlotId, isBooked: false }, { isBooked: true }, { new: true }
+        { _id: timeSlotId, isBooked: false }, 
+        { isBooked: true }, 
+        { new: true }
     );
 
-    if (!slotDoc) return res.status(400).json({ success: false, message: "Slot unavailable" });
+    if (!slotDoc) {
+        return res.status(400).json({ success: false, message: "Slot unavailable or already booked" });
+    }
 
+    // 3. Create Appointment
     const newAppointment = await Appointment.create({
-      doctor: doctorId, patient: patientId,
+      doctor: doctorId, 
+      patient: patientId,
       patientDetails: { firstName, lastName, email, phone },
-      date: slotDoc.date, timeSlotId: slotDoc._id, timeSlot: `${slotDoc.startTime} - ${slotDoc.endTime}`,
-      reason, symptoms, status: "Pending"
+      date: slotDoc.date, 
+      timeSlotId: slotDoc._id, 
+      timeSlot: `${slotDoc.startTime} - ${slotDoc.endTime}`,
+      reason, 
+      symptoms, 
+      status: "Pending"
     });
 
-    slotDoc.appointmentId = newAppointment._id; await slotDoc.save();
+    // 4. Update TimeSlot with appointment reference
+    slotDoc.appointmentId = newAppointment._id; 
+    await slotDoc.save();
 
-    // Email
+    // 5. >>> UPDATE DOCTOR AND PATIENT <<<
+    // Push appointment ID to Doctor
+    await Doctor.findByIdAndUpdate(doctorId, {
+        $push: { myAppointments: newAppointment._id }
+    });
+
+    // Push appointment ID to Patient (User)
+    await Patient.findByIdAndUpdate(patientId, {
+        $push: { myAppointments: newAppointment._id }
+    });
+
+    // 6. Send Email Notification
     try {
       const doctorDetails = await Doctor.findById(doctorId).select("firstName lastName department");
       const emailContent = appointmentPendingTemplate(
-          firstName, slotDoc.date, slotDoc.startTime, reason,
-          `${doctorDetails.firstName} ${doctorDetails.lastName}`, doctorDetails.department
+          firstName, 
+          slotDoc.date, 
+          slotDoc.startTime, 
+          reason,
+          `${doctorDetails.firstName} ${doctorDetails.lastName}`, 
+          doctorDetails.department
       );
       await mailSender(email, "Request Pending | MediCare", emailContent);
-    } catch (e) { console.error("Mail Fail:", e); }
+    } catch (e) { 
+        console.error("Mail Sending Failed:", e); 
+        // We generally don't fail the request if just the email fails, so we log it.
+    }
 
-    return res.status(200).json({ success: true, message: "Requested", data: newAppointment });
+    return res.status(200).json({ 
+        success: true, 
+        message: "Appointment requested successfully", 
+        data: newAppointment 
+    });
 
   } catch (error) {
     console.error("Booking Error:", error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return res.status(500).json({ success: false, message: "Server Error while booking appointment" });
   }
 };
-
 // =================================================================
 // 6. PATIENT & SCHEDULE MANAGEMENT
 // =================================================================

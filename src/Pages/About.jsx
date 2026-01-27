@@ -1,62 +1,32 @@
 import { Card, CardContent } from "../Components/ui/card";
-import { Heart, Shield, Users, Award, Target, Eye, Clock, Stethoscope, GraduationCap, Building } from "lucide-react";
-import hospitalBuilding from "../img/hospital-building.jpg"; // Adjust path as needed
-import medicalTeam from "../img/medical-team.jpg";           // Adjust path as needed
-import medicalEquipment from "../img/medical-equipment.jpg"; // Adjust path as needed
-import hospitalReception from "../img/hospital-reception.jpg"; // Adjust path as needed
+import {  Target, Eye, GraduationCap } from "lucide-react";
+import hospitalBuilding from "../img/hospital-building.jpg"; 
+import medicalTeam from "../img/medical-team.jpg";           
+import medicalEquipment from "../img/medical-equipment.jpg"; 
+import hospitalReception from "../img/hospital-reception.jpg"; 
 import Navbar from "../Components/Common/Navbar";
 import Footer from "../Components/Common/Footer";
 import { useEffect } from "react";
+import { stats , values ,milestones , leadership } from "../Data/AboutPageData";
 const About = () => {
-  const stats = [
-    { icon: Users, value: "50,000+", label: "Patients Treated Annually" },
-    { icon: Stethoscope, value: "500+", label: "Expert Doctors" },
-    { icon: Building, value: "30+", label: "Specialized Departments" },
-    { icon: Clock, value: "29+", label: "Years of Excellence" },
-  ];
+  
 
-  const values = [
-    {
-      icon: Heart,
-      title: "Compassion",
-      description: "We treat every patient with empathy, understanding, and genuine care, ensuring they feel supported throughout their healthcare journey."
-    },
-    {
-      icon: Shield,
-      title: "Integrity",
-      description: "We uphold the highest ethical standards in all our practices, maintaining transparency and honesty in patient care and communication."
-    },
-    {
-      icon: Award,
-      title: "Excellence",
-      description: "We strive for clinical excellence through continuous learning, research, and adoption of cutting-edge medical technologies."
-    },
-    {
-      icon: Users,
-      title: "Teamwork",
-      description: "Our multidisciplinary teams collaborate seamlessly to provide comprehensive, patient-centered care for optimal outcomes."
-    },
-  ];
-
-  const milestones = [
-    { year: "1995", event: "Hospital Founded", description: "MediCare Hospital was established with a vision to provide world-class healthcare." },
-    { year: "2000", event: "First Expansion", description: "Added 200 beds and opened 10 new specialized departments." },
-    { year: "2008", event: "Research Center", description: "Launched our state-of-the-art medical research facility." },
-    { year: "2015", event: "Digital Transformation", description: "Implemented advanced electronic health records and telemedicine services." },
-    { year: "2020", event: "COVID-19 Response", description: "Established dedicated COVID care units and vaccination centers." },
-    { year: "2024", event: "AI Integration", description: "Pioneered AI-assisted diagnostics and treatment planning." },
-  ];
-
-  const leadership = [
-    { name: "Dr. Robert Johnson", role: "Chief Executive Officer", specialty: "Healthcare Administration" },
-    { name: "Dr. Sarah Williams", role: "Chief Medical Officer", specialty: "Internal Medicine" },
-    { name: "Dr. Michael Chen", role: "Chief of Surgery", specialty: "Cardiovascular Surgery" },
-    { name: "Dr. Emily Davis", role: "Director of Research", specialty: "Medical Research" },
-  ];
-// --- ADDED SCROLL TO TOP HERE ---
+  // --- ERROR HANDLING: Scroll Safety ---
   useEffect(() => { 
-    window.scrollTo(0, 0); // Forces page to start at the top
+    try {
+      window.scrollTo(0, 0); 
+    } catch (error) {
+      console.error("Scroll to top failed:", error);
+    }
   }, []);
+
+  // --- ERROR HANDLING: Image Fallback ---
+  const handleImageError = (e) => {
+    e.target.onerror = null; // Prevent infinite loop
+    e.target.style.display = 'none'; // Hide broken image
+    // Optional: You could also set a placeholder here: e.target.src = 'path/to/placeholder.png';
+    console.warn("Image failed to load:", e.target.src);
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background font-sans">
@@ -64,13 +34,15 @@ const About = () => {
         <Navbar />
       </div>
 
-      <main className="flex-1 pt-14"> {/* Added padding-top to account for fixed navbar */}
+      <main className="flex-1 pt-14"> 
         
         {/* Hero Section */}
         <section className="relative h-[50vh] min-h-[400px] overflow-hidden mt-[142px]">
           <div 
             className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${hospitalBuilding})` }}
+            // Note: Background images in inline styles are harder to catch via onError, 
+            // relying on valid imports.
           />
           <div className="absolute inset-0 bg-gradient-to-r from-primary/90 to-primary/70 mix-blend-multiply" />
           <div className="relative container mx-auto px-4 h-full flex items-center">
@@ -139,6 +111,7 @@ const About = () => {
                   src={medicalTeam} 
                   alt="Our Medical Team" 
                   className="rounded-2xl shadow-2xl w-full relative z-10 hover:scale-[1.02] transition-transform duration-500"
+                  onError={handleImageError}
                 />
                 <div className="absolute -bottom-6 -left-6 bg-card text-card-foreground p-6 rounded-xl shadow-xl z-20 border border-border">
                   <div className="text-4xl font-bold text-primary">29+</div>
@@ -221,16 +194,19 @@ const About = () => {
                     src={medicalEquipment} 
                     alt="Medical Equipment" 
                     className="rounded-xl shadow-lg w-full h-48 object-cover hover:opacity-90 transition-opacity"
+                    onError={handleImageError}
                   />
                   <img 
                     src={hospitalReception} 
                     alt="Hospital Reception" 
                     className="rounded-xl shadow-lg w-full h-48 object-cover hover:opacity-90 transition-opacity"
+                    onError={handleImageError}
                   />
                   <img 
                     src={hospitalBuilding} 
                     alt="Hospital Building" 
                     className="rounded-xl shadow-lg w-full h-48 object-cover col-span-2 hover:opacity-90 transition-opacity"
+                    onError={handleImageError}
                   />
                 </div>
               </div>

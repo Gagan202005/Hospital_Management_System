@@ -3,11 +3,11 @@ import { DoctorCard } from "../Components/Core/FindDoctor/DoctorCard";
 import { Button } from "../Components/ui/button";
 import { Input } from "../Components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../Components/ui/select";
-import { Search, Stethoscope, Users, Award, Star, Loader2 } from "lucide-react";
-// import hospitalHero from "../img/hospital-hero.jpg"; // Adjust path
+import { Search, Loader2 } from "lucide-react";
 import hospitalHero from "../img/dep1.jpg";
 import Navbar from "../Components/Common/Navbar";
 import Footer from "../Components/Common/Footer";
+import { toast } from "react-hot-toast"; // Import toast
 
 // API
 import { fetchPublicDoctors } from "../services/operations/DoctorApi";
@@ -23,6 +23,7 @@ const FindDoctor = () => {
     setLoading(true);
     try {
       const data = await fetchPublicDoctors(query, specialty);
+      
       if (data) {
         const formattedDoctors = data.map(doc => ({
           id: doc._id,
@@ -32,28 +33,36 @@ const FindDoctor = () => {
           rating: doc.rating || 4.5,
           experience: doc.experience,
           education: doc.qualification?.[0]?.degree || "MBBS",
-          // location: "Removed as requested", 
           availability: "Mon - Sat",
           consultationFee: doc.consultationFee
         }));
 
         setDoctorsList(formattedDoctors);
 
+        // Populate specialty list only on initial load
         if (specialtyList.length === 0 && !query && !specialty) {
            const uniqueSpecialties = Array.from(new Set(data.map(d => d.specialization))).filter(Boolean);
            setSpecialtyList(uniqueSpecialties);
         }
+
+        // Show success toast only if it's a specific search action (not initial load)
+        if (query || specialty) {
+            toast.success(`Found ${formattedDoctors.length} doctors matching your criteria.`);
+        }
       }
     } catch (error) {
-      console.error("Error loading doctors", error);
+      console.error("SEARCH ERROR:", error);
+      // >>> UPDATED: Show backend error message <<<
+      const errorMessage = error.response?.data?.message || error.message || "Failed to load doctors list.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- ADDED SCROLL TO TOP HERE ---
+  // --- SCROLL TO TOP ---
   useEffect(() => { 
-    window.scrollTo(0, 0); // Forces page to start at the top
+    window.scrollTo(0, 0); 
     getDoctors(); 
   }, []);
 

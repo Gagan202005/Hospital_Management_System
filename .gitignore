@@ -49,8 +49,6 @@ public/manifest.json
 # Optional: Ignore test snapshots
 __snapshots__/
 
-# Optional: Ignore local images
-src/img/
 
 # Optional: Ignore local lib builds
 src/lib/

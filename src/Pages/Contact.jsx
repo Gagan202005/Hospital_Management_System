@@ -11,7 +11,7 @@ import {
   Phone, Mail, MapPin, Clock, Ambulance, MessageSquare, Send,
   Building, Stethoscope, HeartPulse, Baby, Brain, Loader2
 } from "lucide-react";
-// import hospitalReception from "../img/hospital-reception.jpg"; // Ensure path is correct
+
 import hospitalReception from "../img/dep7.jpg";
 // Import API
 import { contactUsApi } from "../services/operations/authApi"; 

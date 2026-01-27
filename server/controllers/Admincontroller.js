@@ -162,8 +162,8 @@ exports.deleteDoctor = async (req, res) => {
         if (appointments.length > 0) {
             const appointmentIds = appointments.map(appt => appt._id);
             await Patient.updateMany(
-                { myappointments: { $in: appointmentIds } },
-                { $pull: { myappointments: { $in: appointmentIds } } }
+                { myAppointments: { $in: appointmentIds } },
+                { $pull: { myAppointments: { $in: appointmentIds } } }
             );
             await Appointment.deleteMany({ doctor: id });
         }
@@ -406,7 +406,7 @@ exports.deletePatient = async (req, res) => {
         if (appointments.length > 0) {
             const appointmentPromises = appointments.map(async (appt) => {
                 if (appt.timeSlotId) await Slot.findByIdAndDelete(appt.timeSlotId);
-                if (appt.doctor) await Doctor.findByIdAndUpdate(appt.doctor, { $pull: { myappointments: appt._id } });
+                if (appt.doctor) await Doctor.findByIdAndUpdate(appt.doctor, { $pull: { myAppointments: appt._id } });
             });
             await Promise.all(appointmentPromises);
             await Appointment.deleteMany({ patient: _id });
@@ -659,13 +659,13 @@ exports.fixAppointment = async (req, res) => {
         newTimeSlot.appointmentId = newAppointment._id;
         await newTimeSlot.save();
 
-        await Patient.findByIdAndUpdate(patient._id, { $push: { myappointments: newAppointment._id } });
+        await Patient.findByIdAndUpdate(patient._id, { $push: { myAppointments: newAppointment._id } });
         
         // 6. UPDATE DOCTOR & FETCH DETAILS FOR EMAIL
         // We use { new: true } to get the doc back so we have the Name and Email
         const doctorDetails = await Doctor.findByIdAndUpdate(
             doctorId, 
-            { $push: { myappointments: newAppointment._id } },
+            { $push: { myAppointments: newAppointment._id } },
             { new: true } 
         );
 
