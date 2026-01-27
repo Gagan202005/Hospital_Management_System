@@ -4,17 +4,16 @@ const app = express();
 // =================================================================
 // IMPORTS
 // =================================================================
-// 1. Standard Libraries & Third-Party Modules
 const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const fileUpload = require("express-fileupload");
 
-// 2. Configuration & Utilities
+// Config & Utilities
 const database = require("./config/database");
 const { cloudinaryconnect } = require("./config/cloudinary");
 
-// 3. Route Handlers
+// Routes
 const AuthRoutes = require("./routes/Auth_routes");
 const PatientRoutes = require("./routes/Patient_routes");
 const DoctorRoutes = require("./routes/Doctor_routes");
@@ -24,45 +23,37 @@ const medicalRecordRoutes = require("./routes/Report_routes");
 // =================================================================
 // CONFIGURATION
 // =================================================================
-
-// Load environment variables
 dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB
+// DB & Cloudinary
 database.connect();
-
-// Connect to Cloudinary
 cloudinaryconnect();
 
 // =================================================================
 // MIDDLEWARE (ORDER MATTERS)
 // =================================================================
 
-// Parse JSON bodies
+// Parse JSON
 app.use(express.json());
 
 // Parse cookies
 app.use(cookieParser());
 
-// ✅ CORS CONFIGURATION (FIXED & SAFE)
-const allowedOrigin = process.env.CORS_ORIGIN || "*";
+// ✅ FINAL CORS SETUP (NO CRASH, NO BUGS)
+const allowedOrigin = process.env.CORS_ORIGIN;
 
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: allowedOrigin, // MUST be a real URL, not "*"
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    maxAge: 14400, // cache preflight for 4 hours
   })
 );
 
-// Handle preflight requests
-app.options("*", cors());
-
-// File upload middleware
+// File uploads
 app.use(
   fileUpload({
     useTempFiles: true,
@@ -71,7 +62,7 @@ app.use(
 );
 
 // =================================================================
-// API ROUTES
+// ROUTES
 // =================================================================
 
 app.use("/api/v1/auth", AuthRoutes);
@@ -84,7 +75,6 @@ app.use("/api/v1/medical-record", medicalRecordRoutes);
 // ROOT & SERVER START
 // =================================================================
 
-// Health check
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -92,7 +82,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// Start server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
