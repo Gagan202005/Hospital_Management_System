@@ -50,8 +50,6 @@ public/manifest.json
 __snapshots__/
 
 
-# Optional: Ignore local lib builds
-src/lib/
 
 # Optional: Ignore package-lock and yarn lock (if you want to keep them out)
 # package-lock.json
