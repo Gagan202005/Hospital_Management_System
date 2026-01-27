@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { format } from "date-fns";
 import { CalendarIcon, ArrowLeft, User, Loader2, IndianRupee, AlertCircle, Lock, LogIn } from "lucide-react";
-import { cn } from "../../../lib/utils";
+import { cn } from "../../../lib/utils.js";
 import { useToast } from "../../../hooks/use-toast";
 import { useSelector } from "react-redux";
 import Navbar from "../../Common/Navbar";
