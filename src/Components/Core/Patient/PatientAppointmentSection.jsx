@@ -33,7 +33,9 @@ export default function PatientAppointmentsSection() {
   const [reportData, setReportData] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
-  const [isReportLoading, setIsReportLoading] = useState(false);
+  
+  // FIX: Track the specific ID of the report being loaded
+  const [loadingReportId, setLoadingReportId] = useState(null); 
 
   // --- 1. Fetch Data ---
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function PatientAppointmentsSection() {
   };
 
   const handleViewReport = async (apptId) => {
-    setIsReportLoading(true);
+    setLoadingReportId(apptId); // Set loading for this specific ID
     try {
       const data = await fetchVisitReport(token, apptId);
       if (data) {
@@ -75,7 +77,7 @@ export default function PatientAppointmentsSection() {
       const errorMessage = error.response?.data?.message || error.message || "Unable to retrieve report";
       toast.error(errorMessage);
     } finally {
-      setIsReportLoading(false);
+      setLoadingReportId(null); // Clear loading state
     }
   };
 
@@ -139,6 +141,7 @@ export default function PatientAppointmentsSection() {
                   appointment={appt} 
                   onDetails={() => handleViewDetails(appt)}
                   statusConfig={getStatusConfig}
+                  loadingReport={false}
                 />
               ))}
             </div>
@@ -167,7 +170,8 @@ export default function PatientAppointmentsSection() {
                   onReport={() => handleViewReport(appt._id)}
                   statusConfig={getStatusConfig}
                   isHistory={true}
-                  loadingReport={isReportLoading}
+                  // FIX: Only show loading if this card's ID matches the loading ID
+                  loadingReport={loadingReportId === appt._id}
                 />
               ))}
             </div>
@@ -337,7 +341,7 @@ export function ViewReportContent({ data }) {
                 </div>
             </div>
 
-            {/* Vitals - FIXED KEYS HERE */}
+            {/* Vitals */}
             <div>
                 <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-red-500"/> Clinical Vitals</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -347,12 +351,10 @@ export function ViewReportContent({ data }) {
                     </div>
                     <div className="border p-3 rounded bg-white text-center">
                         <span className="text-[10px] text-slate-400 uppercase font-bold">Pulse</span>
-                        {/* Fix: changed data.vitalSigns?.pulse to heartRate */}
                         <p className="text-lg font-semibold text-slate-800">{data.vitalSigns?.heartRate || data.vitalSigns?.pulse || "--"} <span className="text-xs font-normal">bpm</span></p>
                     </div>
                     <div className="border p-3 rounded bg-white text-center">
                         <span className="text-[10px] text-slate-400 uppercase font-bold">Temp</span>
-                        {/* Fix: changed data.vitalSigns?.temp to temperature */}
                         <p className="text-lg font-semibold text-slate-800">{data.vitalSigns?.temperature || data.vitalSigns?.temp || "--"} <span className="text-xs font-normal">°F</span></p>
                     </div>
                     <div className="border p-3 rounded bg-white text-center">
