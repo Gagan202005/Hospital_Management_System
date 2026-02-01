@@ -5,28 +5,19 @@ const mailSender = async (email, title, body) => {
   try {
     let transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
+      port: 587,              // CHANGE: Use Port 587 instead of 465
+      secure: false,          // CHANGE: Must be FALSE for Port 587
       auth: {
         user: process.env.MAIL_USER,
         pass: process.env.MAIL_PASS,
       },
-      // --------------------------------------------------------
-      // CRITICAL FIXES FOR DEPLOYMENT
-      // --------------------------------------------------------
       tls: {
-        rejectUnauthorized: true, // Should be true for security
+        rejectUnauthorized: true,
         minVersion: "TLSv1.2"
       },
-      // Force IPv4 (Fixes timeouts on some cloud networks)
-      family: 4, 
-      // Add timeouts to fail fast if it's blocked
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 5000,    // 5 seconds
-      socketTimeout: 10000,     // 10 seconds
-      // Enable logging to see the handshake process
+      // Keep timeouts to fail fast if blocked
+      connectionTimeout: 10000, 
       debug: true, 
-      logger: true 
     });
 
     let info = await transporter.sendMail({
@@ -41,7 +32,6 @@ const mailSender = async (email, title, body) => {
 
   } catch (error) {
     console.log("Error sending email:", error.message);
-    // If you see "Connection timeout" here, your HOST is blocking the port.
   }
 };
 
