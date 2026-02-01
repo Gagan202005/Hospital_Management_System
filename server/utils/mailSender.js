@@ -10,14 +10,15 @@ require('dotenv').config();
 const mailSender = async (email, title, body) => {
   try {
     // =================================================================
-    // 1. CREATE TRANSPORTER
+    // 1. CREATE TRANSPORTER (UPDATED FOR PRODUCTION)
     // =================================================================
-    // Configures the connection to the SMTP server (e.g., Gmail, AWS SES)
     let transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST, // e.g., smtp.gmail.com
+      host: process.env.MAIL_HOST, // Ensure this is "smtp.gmail.com"
+      port: 465,                   // Secure port for Gmail
+      secure: true,                // Must be true for port 465
       auth: {
-        user: process.env.MAIL_USER, // Your email address
-        pass: process.env.MAIL_PASS, // Your App Password (not login password)
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS, // Google App Password
       },
     });
 
@@ -25,10 +26,10 @@ const mailSender = async (email, title, body) => {
     // 2. SEND EMAIL
     // =================================================================
     let info = await transporter.sendMail({
-      from: `"City Care Hospital" <${process.env.MAIL_USER}>`, // Custom Alias
+      from: `"MediCare General Hospital" <${process.env.MAIL_USER}>`,
       to: `${email}`,
       subject: `${title}`,
-      html: `${body}`, // Supports HTML formatting
+      html: `${body}`,
     });
 
     console.log("Email sent successfully:", info.messageId);
@@ -39,8 +40,7 @@ const mailSender = async (email, title, body) => {
     // 3. ERROR HANDLING
     // =================================================================
     console.log("Error sending email:", error.message);
-    // You might want to throw the error here if the calling function needs to know it failed
-    // throw error; 
+    // return error; // Optional: return error if you want to handle it in controller
   }
 };
 
