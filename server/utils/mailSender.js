@@ -1,46 +1,47 @@
 const nodemailer = require("nodemailer");
 require('dotenv').config();
 
-/**
- * Utility to send emails using Nodemailer
- * @param {String} email - Recipient's email address
- * @param {String} title - Subject of the email
- * @param {String} body - HTML body content
- */
 const mailSender = async (email, title, body) => {
   try {
-    // =================================================================
-    // 1. CREATE TRANSPORTER (UPDATED FOR PRODUCTION)
-    // =================================================================
     let transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST, // Ensure this is "smtp.gmail.com"
-      port: 465,                   // Secure port for Gmail
-      secure: true,                // Must be true for port 465
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
       auth: {
         user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS, // Google App Password
+        pass: process.env.MAIL_PASS,
       },
+      // --------------------------------------------------------
+      // CRITICAL FIXES FOR DEPLOYMENT
+      // --------------------------------------------------------
+      tls: {
+        rejectUnauthorized: true, // Should be true for security
+        minVersion: "TLSv1.2"
+      },
+      // Force IPv4 (Fixes timeouts on some cloud networks)
+      family: 4, 
+      // Add timeouts to fail fast if it's blocked
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 5000,    // 5 seconds
+      socketTimeout: 10000,     // 10 seconds
+      // Enable logging to see the handshake process
+      debug: true, 
+      logger: true 
     });
 
-    // =================================================================
-    // 2. SEND EMAIL
-    // =================================================================
     let info = await transporter.sendMail({
       from: `"MediCare General Hospital" <${process.env.MAIL_USER}>`,
-      to: `${email}`,
-      subject: `${title}`,
-      html: `${body}`,
+      to: email,
+      subject: title,
+      html: body,
     });
 
     console.log("Email sent successfully:", info.messageId);
     return info;
 
   } catch (error) {
-    // =================================================================
-    // 3. ERROR HANDLING
-    // =================================================================
     console.log("Error sending email:", error.message);
-    // return error; // Optional: return error if you want to handle it in controller
+    // If you see "Connection timeout" here, your HOST is blocking the port.
   }
 };
 
