@@ -10,29 +10,7 @@
 [![Cloudinary](https://img.shields.io/badge/Cloudinary-Media_Storage-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)](https://cloudinary.com/)
 [![Gemini AI](https://img.shields.io/badge/Gemini_AI-Chatbot-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 
-<br/>
-
-[Live Demo](#) · [Report Bug](https://github.com/Gagan202005/Hospital_Management_System/issues) · [Request Feature](https://github.com/Gagan202005/Hospital_Management_System/issues)
-
 </div>
-
----
-
-## 📋 Table of Contents
-
-- [About The Project](#-about-the-project)
-- [Key Features](#-key-features)
-- [Screenshots](#-screenshots)
-- [System Architecture](#-system-architecture)
-- [Database Schema Design](#-database-schema-design)
-- [Workflow Diagrams](#-workflow-diagrams)
-- [Tech Stack](#-tech-stack)
-- [Folder Structure](#-folder-structure)
-- [Getting Started](#-getting-started)
-- [Environment Variables](#-environment-variables)
-- [API Reference](#-api-reference)
-- [Contributing](#-contributing)
-- [License](#-license)
 
 ---
 
@@ -96,78 +74,13 @@ The platform covers the complete hospital workflow: from patient registration an
 
 ---
 
-## 📸 Screenshots
+## 📸 Demo Video
 
-<details>
-<summary><b>🏠 Home Page</b></summary>
-<br/>
 
-> Add screenshot of the home page hero section here
->
-> `![Home Page](screenshots/home.png)`
 
-</details>
+https://github.com/user-attachments/assets/274eed7a-31e5-4028-bc0d-8ab475d5a291
 
-<details>
-<summary><b>🔐 Authentication (Login / Signup)</b></summary>
-<br/>
 
-> Add screenshots of login and signup pages here
->
-> `![Login](screenshots/login.png)`
-> `![Signup](screenshots/signup.png)`
-
-</details>
-
-<details>
-<summary><b>🛡️ Admin Dashboard</b></summary>
-<br/>
-
-> Add screenshots of admin dashboard overview, doctor management, bed management, and ambulance management here
->
-> `![Admin Dashboard](screenshots/admin-dashboard.png)`
-
-</details>
-
-<details>
-<summary><b>👨‍⚕️ Doctor Dashboard</b></summary>
-<br/>
-
-> Add screenshots of doctor dashboard overview, appointment management, time slot manager, and patient records here
->
-> `![Doctor Dashboard](screenshots/doctor-dashboard.png)`
-
-</details>
-
-<details>
-<summary><b>🧑 Patient Dashboard</b></summary>
-<br/>
-
-> Add screenshots of patient dashboard overview, appointments, and medical reports here
->
-> `![Patient Dashboard](screenshots/patient-dashboard.png)`
-
-</details>
-
-<details>
-<summary><b>🔍 Find Doctor & Booking</b></summary>
-<br/>
-
-> Add screenshots of doctor search, doctor profile, and appointment booking flow here
->
-> `![Find Doctor](screenshots/find-doctor.png)`
-
-</details>
-
-<details>
-<summary><b>🤖 AI Medical Chatbot</b></summary>
-<br/>
-
-> Add screenshot of the AI chatbot interface here
->
-> `![AI Chatbot](screenshots/ai-chatbot.png)`
-
-</details>
 
 ---
 
@@ -217,16 +130,6 @@ graph TB
 
 ```mermaid
 erDiagram
-    PATIENT ||--o{ APPOINTMENT : "books"
-    DOCTOR ||--o{ APPOINTMENT : "handles"
-    DOCTOR ||--o{ TIMESLOT : "creates"
-    APPOINTMENT ||--o| TIMESLOT : "locks"
-    APPOINTMENT ||--o| MEDICAL_RECORD : "generates"
-    DOCTOR ||--o{ MEDICAL_RECORD : "writes"
-    PATIENT ||--o{ MEDICAL_RECORD : "receives"
-    DEPARTMENT ||--o{ DOCTOR : "contains"
-    PATIENT ||--o| BED : "occupies"
-    AMBULANCE ||--o| PATIENT : "transports"
 
     PATIENT {
         ObjectId _id PK
@@ -312,7 +215,7 @@ erDiagram
 
     MEDICAL_RECORD {
         ObjectId _id PK
-        ObjectId appointmentId FK UK
+        ObjectId appointmentId FK
         ObjectId doctor FK
         ObjectId patient FK
         Object patientDetails "name, email, phone snapshot"
@@ -364,6 +267,18 @@ erDiagram
         String otp
         Date createdAt "TTL: 5 minutes"
     }
+
+    PATIENT ||--o{ APPOINTMENT : "books"
+    DOCTOR ||--o{ APPOINTMENT : "handles"
+    DOCTOR ||--o{ TIMESLOT : "creates"
+    APPOINTMENT ||--o| TIMESLOT : "locks"
+    APPOINTMENT ||--o| MEDICAL_RECORD : "generates"
+    DOCTOR ||--o{ MEDICAL_RECORD : "writes"
+    PATIENT ||--o{ MEDICAL_RECORD : "receives"
+    DEPARTMENT ||--o{ DOCTOR : "contains"
+    PATIENT ||--o| BED : "occupies"
+    AMBULANCE ||--o| PATIENT : "transports"
+
 ```
 
 ---
@@ -903,23 +818,9 @@ Contributions are what make the open source community such an amazing place to l
 
 ---
 
-## 📄 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
-## 📞 Contact
-
-**Gagan Singhal** — [GitHub](https://github.com/Gagan202005)
-
-Project Link: [https://github.com/Gagan202005/Hospital_Management_System](https://github.com/Gagan202005/Hospital_Management_System)
-
----
 
 <div align="center">
 
 **⭐ If you found this project helpful, please give it a star! ⭐**
 
 </div>
-]]>
