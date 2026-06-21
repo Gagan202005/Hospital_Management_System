@@ -1,34 +1,41 @@
-const nodemailer = require("nodemailer");
 require('dotenv').config();
 
 const mailSender = async (email, title, body) => {
   try {
-    let transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,              // CHANGE: Use Port 587 instead of 465
-      secure: false,          // CHANGE: Must be FALSE for Port 587
-      auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
+    const credentials = Buffer.from(
+      `${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`
+    ).toString('base64');
+
+    const response = await fetch('https://api.mailjet.com/v3.1/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${credentials}`,
       },
-      tls: {
-        rejectUnauthorized: true,
-        minVersion: "TLSv1.2"
-      },
-      // Keep timeouts to fail fast if blocked
-      connectionTimeout: 10000, 
-      debug: true, 
+      body: JSON.stringify({
+        Messages: [
+          {
+            From: {
+              Email: process.env.MAIL_USER,
+              Name: "MediCare General Hospital",
+            },
+            To: [{ Email: email }],
+            Subject: title,
+            HTMLPart: body,
+          },
+        ],
+      }),
     });
 
-    let info = await transporter.sendMail({
-      from: `"MediCare General Hospital" <${process.env.MAIL_USER}>`,
-      to: email,
-      subject: title,
-      html: body,
-    });
+    const data = await response.json();
 
-    console.log("Email sent successfully:", info.messageId);
-    return info;
+    if (!response.ok) {
+      console.log("Error sending email:", data.ErrorMessage || JSON.stringify(data));
+      return;
+    }
+
+    console.log("Email sent successfully:", data.Messages[0].To[0].MessageID);
+    return data;
 
   } catch (error) {
     console.log("Error sending email:", error.message);
