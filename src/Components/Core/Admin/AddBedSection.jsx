@@ -169,7 +169,7 @@ export const AddBedSection = () => {
       switch(status) {
           case "Occupied": return { card: "border-red-200 bg-red-50/30", badge: "bg-red-100 text-red-700 hover:bg-red-100" };
           case "Maintenance": return { card: "border-amber-200 bg-amber-50/30", badge: "bg-amber-100 text-amber-700 hover:bg-amber-100" };
-          default: return { card: "border-green-200 bg-green-50/30", badge: "bg-green-100 text-green-700 hover:bg-green-100" };
+          default: return { card: "border-green-200 bg-green-50/30", badge: "bg-green-100 text-green-700 hover:bg-green-100" };//available
       }
   };
 

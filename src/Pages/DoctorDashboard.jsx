@@ -79,6 +79,7 @@ const DoctorDashboard = () => {
                 key={item.path}
                 to={item.path}
                 end={item.path === "overview"}
+                //isActive -> Indicates if the link's URL matches the current location.
                 className={({ isActive }) => `
                   flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200
                   ${isActive 

@@ -108,7 +108,7 @@ export function TimeSlotManager() {
       if (dateDiff !== 0) return dateDiff;
       return a.startTime.localeCompare(b.startTime);
     })
-    .reduce((groups, slot) => {
+    .reduce((groups, slot) => { //Calls the specified callback function for all the elements in an array
       const dateKey = slot.date.toDateString(); 
       if (!groups[dateKey]) groups[dateKey] = { dateObj: slot.date, slots: [] };
       groups[dateKey].slots.push(slot);

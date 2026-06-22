@@ -27,6 +27,7 @@ export const AddAmbulanceSection = () => {
   const [formData, setFormData] = useState({ vehicleNumber: "", model: "", year: "", driverName: "", driverLicense: "", driverContact: "", pricePerHour: "" });
   const [bookingData, setBookingData] = useState({ patientIdInput: "", address: "", reason: "" });
 
+  //scroll lock
   useEffect(() => {
     if (isBookModalOpen) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = 'unset';
@@ -47,7 +48,7 @@ export const AddAmbulanceSection = () => {
   };
 
   useEffect(() => { fetchAmbulances(); }, [token]);
-
+//useMemo will only recompute the memoized value when one of the deps has changed.
   const stats = useMemo(() => {
     const total = ambulances.length;
     const available = ambulances.filter(a => a.isAvailable).length;

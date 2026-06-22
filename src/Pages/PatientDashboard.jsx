@@ -18,7 +18,7 @@ import { useSelector } from "react-redux";
 const PatientDashboard = () => {
   // --- Hooks & State ---
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const location = useLocation();
+  const location = useLocation();//Returns the current Location.
   const { user } = useSelector((state) => state.profile);
 
   // --- Effect: Scroll Lock ---

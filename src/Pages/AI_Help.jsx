@@ -47,7 +47,6 @@ const AiChat = () => {
   };
 
   return (
-    // Changed bg to a full gradient for a more "tech" feel
     <div className="flex flex-col h-screen bg-slate-50 font-sans overflow-hidden">
       
       {/* --- CUSTOM COMPACT HEADER (Replaces Navbar) --- */}

@@ -46,7 +46,7 @@ const AdminDashboard = () => {
   ];
 
   const getCurrentLabel = () => {
-    const currentItem = navItems.find(item => location.pathname.includes(item.path));
+    const currentItem = navItems.find(item => location.pathname.includes(item.path));//A URL pathname, beginning with a /.
     return currentItem ? currentItem.label : "Admin Portal";
   };
 
@@ -139,6 +139,7 @@ const AdminDashboard = () => {
                   key={item.path}
                   to={item.path}
                   onClick={() => setIsMobileMenuOpen(false)}
+                  //isActive -> Indicates if the link's URL matches the current location.
                   className={({ isActive }) => `flex items-center w-full px-4 py-3 text-base font-medium rounded-xl transition-all ${isActive ? "bg-indigo-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100"}`}
                 >
                   <item.icon className="w-5 h-5 mr-3" />

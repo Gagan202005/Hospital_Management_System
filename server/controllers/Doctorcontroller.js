@@ -159,7 +159,8 @@ exports.bookAppointment = async (req, res) => {
     }
     const patientId = req.user.id;
 
-    // 2. ATOMIC LOCK: Find slot and mark as booked
+    // 2. ATOMIC LOCK: Find slot and mark as booked (atomic operation)
+
     const slotDoc = await TimeSlot.findOneAndUpdate(
         { _id: timeSlotId, isBooked: false }, 
         { isBooked: true }, 
