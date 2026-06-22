@@ -104,7 +104,7 @@ graph TB
     subgraph External["☁️ External Services"]
         DB[("MongoDB Atlas<br/>Database")]
         CLOUD["Cloudinary<br/>Image & File Storage"]
-        MAIL["Nodemailer<br/>SMTP Email Service"]
+        MAIL["Resend<br/>Email API Service"]
         GEMINI["Google Gemini<br/>AI Chatbot API"]
     end
 
@@ -432,7 +432,7 @@ flowchart LR
     H -->|"Allowed"| J["⚙️ Controller"]
     J -->|"Mongoose Query"| K[("🗄️ MongoDB")]
     J -->|"File Upload"| L["☁️ Cloudinary"]
-    J -->|"Send Email"| M["📧 Nodemailer"]
+    J -->|"Send Email"| M["📧 Resend API"]
     J -->|"AI Query"| N["🤖 Gemini API"]
     K --> O["✅ JSON Response"]
     O --> A
@@ -470,7 +470,7 @@ flowchart LR
 | **JWT (jsonwebtoken)** | Stateless authentication tokens |
 | **bcrypt** | Password hashing |
 | **Cloudinary** | Cloud storage for images and documents |
-| **Nodemailer** | SMTP email service with HTML templates |
+| **Resend** | HTTP email API service with HTML templates |
 | **Google Generative AI** | Gemini API for medical chatbot |
 | **Razorpay** | Payment gateway integration (planned) |
 | **express-fileupload** | Multipart file upload handling |
@@ -593,7 +593,7 @@ hospital_management_system/
 │   │   ├── AppointmentPendingM...   #     Pending notifications
 │   │   └── AppointmentExpiryMa...   #     Expiry reminders
 │   ├── utils/
-│   │   ├── mailSender.js            #   Nodemailer transport
+│   │   ├── mailSender.js            #   Resend email API client
 │   │   └── FileUploader.js          #   Cloudinary upload helper
 │   ├── index.js                     #   Server entry point
 │   └── package.json                 #   Backend dependencies
@@ -616,7 +616,7 @@ Make sure you have the following installed on your machine:
 - **npm** (v9 or higher) — Comes with Node.js
 - **MongoDB Atlas** account — [Sign up free](https://www.mongodb.com/cloud/atlas)
 - **Cloudinary** account — [Sign up free](https://cloudinary.com/)
-- **Gmail App Password** (for email service) — [Generate here](https://myaccount.google.com/apppasswords)
+- **Resend** account + verified domain (for email service) — [Sign up free](https://resend.com/)
 - **Google AI API Key** (for Gemini chatbot) — [Get key](https://ai.google.dev/)
 
 ### Installation
@@ -667,10 +667,9 @@ CLOUD_NAME = your_cloudinary_cloud_name
 API_KEY = your_cloudinary_api_key
 API_SECRET = your_cloudinary_api_secret
 
-# Email (Gmail SMTP)
-MAIL_HOST = smtp.gmail.com
-MAIL_USER = your_email@gmail.com
-MAIL_PASS = your_gmail_app_password
+# Email (Resend API)
+RESEND_API_KEY = re_your_resend_api_key
+MAIL_FROM = noreply@yourdomain.com
 
 # Google Gemini AI
 GEMINI_API_KEY = your_gemini_api_key
@@ -678,6 +677,8 @@ GEMINI_API_KEY = your_gemini_api_key
 # CORS
 CORS_ORIGIN = http://localhost:3000
 ```
+
+> **Note:** The email system uses [Resend](https://resend.com/) with a verified custom domain. You need to add your domain on Resend's dashboard and configure the DNS records (MX, SPF, DKIM) to start sending emails.
 
 **5. Run the application**
 
@@ -716,9 +717,8 @@ http://localhost:3000
 | `CLOUD_NAME` | `server/.env` | Cloudinary cloud name |
 | `API_KEY` | `server/.env` | Cloudinary API key |
 | `API_SECRET` | `server/.env` | Cloudinary API secret |
-| `MAIL_HOST` | `server/.env` | SMTP host (e.g., smtp.gmail.com) |
-| `MAIL_USER` | `server/.env` | Email address for sending mails |
-| `MAIL_PASS` | `server/.env` | Gmail app password |
+| `RESEND_API_KEY` | `server/.env` | Resend API key for email service |
+| `MAIL_FROM` | `server/.env` | Verified sender email (e.g., `noreply@yourdomain.com`) |
 | `GEMINI_API_KEY` | `server/.env` | Google Generative AI API key |
 | `CORS_ORIGIN` | `server/.env` | Allowed frontend origin for CORS |
 
