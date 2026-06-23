@@ -85,5 +85,4 @@ const medicalRecordSchema = new mongoose.Schema(
   }
 );
 
-// Prevent model overwrite in serverless environments (optional safety check)
 module.exports = mongoose.models.MedicalRecord || mongoose.model("MedicalRecord", medicalRecordSchema);

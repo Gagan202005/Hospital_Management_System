@@ -9,7 +9,6 @@ const { uploadImageToCloudinary } = require("../utils/FileUploader");
 // parses prescriptions, and marks the appointment as "Completed".
 exports.createVisitReport = async (req, res) => {
   try {
-    // --- Destructure Input Data ---
     const {
       appointmentId,
       diagnosis,

@@ -80,6 +80,10 @@ const TimeSlotSchema = new mongoose.Schema({
 // =================================================================
 // Prevent duplicate slots: A doctor cannot have two slots with the 
 // same Start Time on the same Date.
+
+//A unique compound index on (doctorId, date, startTime) ensures 
+// that a doctor cannot have multiple time slots starting at the same 
+// time on the same day while also improving lookup performance.
 TimeSlotSchema.index({ doctorId: 1, date: 1, startTime: 1 }, { unique: true });
 
 

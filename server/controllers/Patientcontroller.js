@@ -6,10 +6,8 @@ const OTP = require("../models/OTP");
 
 const bcrypt = require("bcrypt");
 const otpGenerator = require("otp-generator");
-const mailSender = require("../utils/mailSender"); // Ensure this is imported
+const mailSender = require("../utils/mailSender");
 require("dotenv").config();
-
-// --- Import Template ---
 const { otpVerificationEmail } = require("../mail/templates/VerificationEmail");
 
 // =================================================================
@@ -91,10 +89,6 @@ exports.sendotp = async (req, res) => {
       result = await OTP.findOne({ otp: otp });
     }
 
-    // 3. Save OTP to DB
-    // NOTE: If your OTP model has a pre-save hook that sends mail, 
-    // it might send a generic mail. Using 'mailSender' here explicitly 
-    // allows us to use our pretty template.
     const otpPayload = { email, otp };
     await OTP.create(otpPayload);
 
@@ -103,7 +97,7 @@ exports.sendotp = async (req, res) => {
         await mailSender(
             email, 
             "Verification Code - City Care Hospital", 
-            otpVerificationEmail(otp) // Use the new template
+            otpVerificationEmail(otp)
         );
     } catch (mailError) {
         console.error("Error sending OTP email:", mailError);
@@ -113,7 +107,6 @@ exports.sendotp = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "OTP Sent Successfully",
-      otp, // Optional: usually removed in production for security
     });
 
   } catch (error) {
@@ -215,7 +208,6 @@ exports.getPatientDashboardStats = async (req, res) => {
     // --- FETCH RAW DATA ---
     
     // Fetch ALL active appointments starting from today onwards
-    // We filter them precisely in JS below
     const activeAppointments = await Appointment.find({
       patient: patientId, 
       status: { $in: ["Pending", "Confirmed"] }, 
@@ -226,7 +218,6 @@ exports.getPatientDashboardStats = async (req, res) => {
 
     // --- LOGIC: FIND TRUE NEXT APPOINTMENT ---
     
-    // Map appointments to include a comparable 'fullDateTime' object
     const validFutureAppointments = activeAppointments.map(appt => {
         // A. Create base date from the appointment date
         const fullDateTime = new Date(appt.date);
@@ -235,7 +226,6 @@ exports.getPatientDashboardStats = async (req, res) => {
         // Scenario 1: You have a populated timeSlotId with startTime (Best Case)
         // Scenario 2: You only have the timeSlot string "09:00 - 09:30" stored in appt
         let timeString = "00:00";
-        
         if (appt.timeSlotId && appt.timeSlotId.startTime) {
             timeString = appt.timeSlotId.startTime; 
         } else if (appt.timeSlot) {
@@ -244,7 +234,7 @@ exports.getPatientDashboardStats = async (req, res) => {
         }
 
         // C. Set Hours/Minutes on the Date Object
-        // Assumes timeString is "HH:mm" (24h format) e.g., "14:30"
+        // timeString is "HH:mm" (24h format) e.g., "14:30"
         const [hours, minutes] = timeString.split(':').map(Number);
         fullDateTime.setHours(hours, minutes, 0, 0);
 

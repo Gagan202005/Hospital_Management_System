@@ -104,7 +104,6 @@ const doctorSchema = new mongoose.Schema(
             default: "Active",
         },
         
-        // Basic availability tracking (Can be expanded with TimeSlot model)
         availability: [{
             day: { type: String }, // e.g., "Monday"
             startTime: { type: String }, // "09:00"

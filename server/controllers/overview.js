@@ -1,11 +1,5 @@
 const Patient = require("../models/Patient");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const OTP = require("../models/OTP")
-const otpGenerator = require("otp-generator");
-const Doctor = require("../models/Doctor");
 const Appointment = require("../models/Appointment");
-const crypto = require("crypto");
 const MedicalRecord = require("../models/Medicalrecord")
 require("dotenv").config();
 
@@ -85,7 +79,6 @@ exports.editprofile = async (req, res) => {
  */
 exports.getallreports = async (req,res) => {
     try{
-        // Fix: Use req.user.id directly, not destructuring property
         const patientID = req.user.id; 
 
         if(!patientID){

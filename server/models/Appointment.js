@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const appointmentSchema = new mongoose.Schema(
   {
     // =================================================================
-    // RELATIONSHIPS (Who is involved?)
+    // RELATIONSHIPS
     // =================================================================
     doctor: {
       type: mongoose.Schema.Types.ObjectId,
@@ -36,7 +36,6 @@ const appointmentSchema = new mongoose.Schema(
       required: true, // The specific calendar date of the appointment
     },
     
-    // Technical Reference: Used for availability logic (locking the slot)
     timeSlotId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TimeSlot",

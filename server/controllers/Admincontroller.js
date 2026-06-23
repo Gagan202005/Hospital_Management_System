@@ -174,6 +174,11 @@ exports.deleteDoctor = async (req, res) => {
             const recordPromises = medicalRecords.map(async (record) => {
                 if (record.reportUrl) await deleteFromCloudinary(record.reportUrl);
             });
+            //Promise.all() is used to run multiple independent 
+            // asynchronous operations concurrently and wait until 
+            // all of them complete before proceeding. 
+            // In this case it deletes all Cloudinary reports in 
+            // parallel before removing their database records.
             await Promise.all(recordPromises);
             await MedicalRecord.deleteMany({ doctor: id });
         }
@@ -417,7 +422,7 @@ exports.deletePatient = async (req, res) => {
             const recordPromises = medicalRecords.map(async (record) => {
                 if (record.reportUrl) await deleteFromCloudinary(record.reportUrl);
             });
-            await Promise.all(recordPromises);
+            await Promise.all(recordPromises);//wait here till all promises get resolved
             await MedicalRecord.deleteMany({ patient: _id });
         }
 

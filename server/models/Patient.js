@@ -138,7 +138,14 @@ patientSchema.pre('save', async function(next) {
     // Only generate ID if the document is new
     if (this.isNew) {
         try {
-            // Find the patient with the highest patientID
+            // lastPatient → Stores the patient having the highest patientID.
+            // this → Refers to the current patient document being saved.
+            // this.constructor → Refers to the Patient model.
+            // findOne() → Returns a single document.
+            // {} → Empty filter, search among all patients.
+            // { patientID: 1 } → Return only the patientID field.
+            // .sort({ patientID: -1 }) → Sort by patientID in descending order.
+            // Result → Patient with the largest patientID.
             const lastPatient = await this.constructor.findOne({}, { patientID: 1 })
                 .sort({ patientID: -1 });
             

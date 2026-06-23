@@ -101,12 +101,18 @@ exports.getPublicDoctors = async (req, res) => {
 
     if (specialty && specialty !== "All specialties") query.specialization = specialty;
 
+    //lean() returns plain JavaScript objects instead of Mongoose documents, 
+    // improving query performance and reducing memory usage for read-only 
+    // operations, but it removes Mongoose features like .save(), virtuals, 
+    // getters/setters, and middleware.
+
     let doctors = await Doctor.find(query)
       .select("firstName lastName specialization image experience qualification phoneno consultationFee doctorID rating")
       .lean();
-
+    // return doctors in decreasing order of experience
     doctors.sort((a, b) => (parseInt(b.experience) || 0) - (parseInt(a.experience) || 0));
 
+    
     if (!searchQuery && (!specialty || specialty === "All specialties")) doctors = doctors.slice(0, 8);
 
     return res.status(200).json({ success: true, count: doctors.length, data: doctors });

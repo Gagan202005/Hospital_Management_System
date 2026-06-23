@@ -24,7 +24,4 @@ const OTPSchema = new mongoose.Schema({
     },
 });
 
-// NOTE: We removed the pre("save") hook here because we are sending
-// the email manually in the controller.
-
 module.exports = mongoose.model("OTP", OTPSchema);

@@ -41,12 +41,11 @@ app.use(express.json());
 // Parse cookies
 app.use(cookieParser());
 
-// ✅ FINAL CORS SETUP (NO CRASH, NO BUGS)
 const allowedOrigin = process.env.CORS_ORIGIN;
 
 app.use(
   cors({
-    origin: allowedOrigin, // MUST be a real URL, not "*"
+    origin: allowedOrigin,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
