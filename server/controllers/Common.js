@@ -180,7 +180,7 @@ exports.getGeminiResponse = async (req, res) => {
     }
 
     // ✅ FIX: Use "gemini-2.0-flash" (Explicitly available in your list)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
     // --- SYSTEM CONTEXT & RULES ---
     const systemInstruction = `
