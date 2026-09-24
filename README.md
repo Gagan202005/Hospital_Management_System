@@ -6,6 +6,7 @@
 [![React](https://img.shields.io/badge/React-19.1-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-Express_5-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose_8-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Redis](https://img.shields.io/badge/Redis-Upstash-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://upstash.com/)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Cloudinary](https://img.shields.io/badge/Cloudinary-Media_Storage-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)](https://cloudinary.com/)
 [![Gemini AI](https://img.shields.io/badge/Gemini_AI-Chatbot-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
@@ -23,7 +24,9 @@ The platform covers the complete hospital workflow: from patient registration an
 ### What makes this project stand out?
 
 - 🏗️ **Production-Grade Architecture** — Clean separation of concerns with MVC pattern, RESTful APIs, and Redux state management.
-- 🔐 **Enterprise-Level Security** — JWT authentication, role-based authorization middleware, bcrypt password hashing, and demo mode protection.
+- 🔐 **Enterprise-Level Security** — Dual-token authentication (short-lived JWT access tokens + Redis-backed refresh tokens), role-based authorization middleware, bcrypt password hashing, rate limiting, and demo mode protection.
+- ⚡ **Redis-Powered Infrastructure** — Upstash Redis for refresh token storage with instant revocation, token rotation on every refresh, and distributed rate limiting across server instances.
+- 🛡️ **3-Tier Rate Limiting** — Redis-backed rate limiters protecting auth routes (10 req/15min), sensitive endpoints (5 req/15min), and all API routes (100 req/min) against brute-force and abuse.
 - 🤖 **AI Integration** — Built-in medical chatbot powered by Google Gemini API for symptom guidance and hospital information.
 - 📧 **Automated Email System** — Beautiful HTML email templates for OTP verification, appointment confirmations, status updates, and account creation.
 - 📊 **Rich Analytics Dashboards** — Each role gets KPI cards, charts (Recharts), and real-time statistics on their dashboard overview.
@@ -91,10 +94,11 @@ graph TB
     subgraph Client["🖥️ Frontend (React 19 + Redux Toolkit)"]
         UI["UI Layer<br/>React Components + Radix UI + Tailwind CSS"]
         STATE["State Management<br/>Redux Toolkit (authSlice, profileSlice)"]
-        SERVICES["API Service Layer<br/>Axios HTTP Client"]
+        SERVICES["API Service Layer<br/>Axios HTTP Client + Auto-Refresh Interceptor"]
     end
 
     subgraph Server["⚙️ Backend (Node.js + Express 5)"]
+        RL["Rate Limiter Layer<br/>express-rate-limit + Redis Store"]
         ROUTES["Route Layer<br/>Auth | Patient | Doctor | Admin | Report"]
         MW["Middleware Layer<br/>JWT Auth | Role Guard | Demo Mode"]
         CTRL["Controller Layer<br/>Business Logic & Validation"]
@@ -103,6 +107,7 @@ graph TB
 
     subgraph External["☁️ External Services"]
         DB[("MongoDB Atlas<br/>Database")]
+        REDIS[("Redis / Upstash<br/>Refresh Tokens + Rate Limits")]
         CLOUD["Cloudinary<br/>Image & File Storage"]
         MAIL["Resend<br/>Email API Service"]
         GEMINI["Google Gemini<br/>AI Chatbot API"]
@@ -110,11 +115,14 @@ graph TB
 
     UI --> STATE
     STATE --> SERVICES
-    SERVICES -- "HTTP REST API" --> ROUTES
+    SERVICES -- "HTTP REST API<br/>Access Token in Header<br/>Refresh Token in Cookie" --> RL
+    RL --> ROUTES
     ROUTES --> MW
     MW --> CTRL
     CTRL --> MODELS
     MODELS --> DB
+    CTRL --> REDIS
+    RL --> REDIS
     CTRL --> CLOUD
     CTRL --> MAIL
     CTRL --> GEMINI
@@ -285,19 +293,21 @@ erDiagram
 
 ## 🔄 Workflow Diagrams
 
-### 1. User Authentication Flow
+### 1. User Authentication Flow (Dual-Token System)
 
 ```mermaid
 sequenceDiagram
     actor P as Patient
     participant C as React Client
     participant S as Express Server
+    participant R as Redis (Upstash)
     participant DB as MongoDB
     participant E as Email Service
 
     Note over P,E: PATIENT REGISTRATION
     P->>C: Fill signup form (name, email, phone, password)
     C->>S: POST /api/v1/auth/sendotp {email}
+    S->>S: ⚡ Rate Limiter Check (10 req/15min)
     S->>S: Generate 6-digit OTP
     S->>DB: Store OTP (TTL: 5 min)
     S->>E: Send OTP verification email
@@ -309,15 +319,36 @@ sequenceDiagram
     S->>DB: Create Patient document
     S-->>C: ✅ Registration successful
 
-    Note over P,E: LOGIN (All Roles)
+    Note over P,E: LOGIN (All Roles) — Dual Token Issuance
     P->>C: Enter email + password
     C->>S: POST /api/v1/auth/login
+    S->>S: ⚡ Rate Limiter Check (10 req/15min)
     S->>DB: Find user across Patient/Doctor/Admin collections
     S->>S: Compare bcrypt hash
-    S->>S: Generate JWT token (id, email, role)
-    S-->>C: ✅ {token, user, role}
-    C->>C: Store token in localStorage
+    S->>S: Generate Access Token (JWT, 15 min expiry)
+    S->>R: Store Refresh Token (UUID, 7 day TTL)
+    S-->>C: ✅ {accessToken, user} + refreshToken in httpOnly cookie
+    C->>C: Store accessToken in localStorage
     C->>C: Redirect to role-based dashboard
+
+    Note over P,E: AUTOMATIC TOKEN REFRESH (Seamless)
+    C->>S: API request with expired access token
+    S-->>C: ❌ 401 Unauthorized
+    C->>C: Axios interceptor catches 401
+    C->>S: POST /api/v1/auth/refresh (cookie auto-sent)
+    S->>R: Verify refresh token UUID
+    S->>R: Delete old token (rotation)
+    S->>R: Store new refresh token
+    S-->>C: ✅ {new accessToken} + new refreshToken cookie
+    C->>S: Retry original request with new token
+    S-->>C: ✅ Original response
+
+    Note over P,E: LOGOUT
+    P->>C: Click logout
+    C->>S: POST /api/v1/auth/logout
+    S->>R: Delete refresh token from Redis
+    S-->>C: ✅ Cookie cleared
+    C->>C: Clear localStorage, redirect to home
 ```
 
 ### 2. Appointment Booking Flow
@@ -421,16 +452,19 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A["🖥️ React Component"] -->|"Axios Request"| B["📡 API Service Layer"]
-    B -->|"HTTP + JWT Header"| C["🛣️ Express Router"]
-    C -->|"req, res, next"| D{"🔒 Auth Middleware"}
-    D -->|"Invalid Token"| E["❌ 401 Unauthorized"]
+    A["🖥️ React Component"] -->|"Axios Request"| B["📡 API Service Layer<br/>+ Auto-Refresh Interceptor"]
+    B -->|"HTTP + Access Token Header<br/>+ Refresh Token Cookie"| RL{"⚡ Rate Limiter<br/>Redis-backed"}
+    RL -->|"Limit Exceeded"| RLE["❌ 429 Too Many Requests"]
+    RL -->|"Allowed"| C["🛣️ Express Router"]
+    C -->|"req, res, next"| D{"🔒 Auth Middleware<br/>JWT Verify (15 min)"}
+    D -->|"Expired/Invalid"| E["❌ 401 → Interceptor<br/>auto-calls /refresh"]
     D -->|"Valid Token"| F{"🛡️ Role Guard"}
     F -->|"Wrong Role"| G["❌ 403 Forbidden"]
     F -->|"Authorized"| H{"🔐 Demo Check"}
     H -->|"Demo + Write Op"| I["❌ 403 Demo Restricted"]
     H -->|"Allowed"| J["⚙️ Controller"]
     J -->|"Mongoose Query"| K[("🗄️ MongoDB")]
+    J -->|"Token Ops"| R[("⚡ Redis<br/>Refresh Tokens")]
     J -->|"File Upload"| L["☁️ Cloudinary"]
     J -->|"Send Email"| M["📧 Resend API"]
     J -->|"AI Query"| N["🤖 Gemini API"]
@@ -440,6 +474,8 @@ flowchart LR
     style A fill:#61DAFB,color:#000
     style J fill:#68A063,color:#fff
     style K fill:#47A248,color:#fff
+    style R fill:#DC382D,color:#fff
+    style RL fill:#FF6B35,color:#fff
 ```
 
 ---
@@ -467,7 +503,11 @@ flowchart LR
 | **Node.js** | Runtime environment |
 | **Express 5** | Web framework for REST APIs |
 | **Mongoose 8** | MongoDB ODM with schema validation |
-| **JWT (jsonwebtoken)** | Stateless authentication tokens |
+| **JWT (jsonwebtoken)** | Short-lived access tokens (15 min) for stateless authentication |
+| **Redis (ioredis)** | Refresh token storage, rate limit counters, instant token revocation |
+| **express-rate-limit** | 3-tier rate limiting middleware (auth, strict, global) |
+| **rate-limit-redis** | Redis-backed store for distributed rate limiting |
+| **uuid** | Opaque refresh token generation (cryptographically random) |
 | **bcrypt** | Password hashing |
 | **Cloudinary** | Cloud storage for images and documents |
 | **Resend** | HTTP email API service with HTML templates |
@@ -475,11 +515,12 @@ flowchart LR
 | **Razorpay** | Payment gateway integration (planned) |
 | **express-fileupload** | Multipart file upload handling |
 
-### Database
+### Database & Cache
 | Technology | Purpose |
 |---|---|
 | **MongoDB Atlas** | Cloud-hosted NoSQL database |
 | **Mongoose** | Schema modeling, validation, pre-save hooks, indexing |
+| **Redis (Upstash)** | Cloud-hosted Redis for refresh tokens (key: `refresh:<uuid>`, TTL: 7 days) and rate limit counters (key: `rl:<prefix>:<ip>`) |
 
 ---
 
@@ -556,18 +597,20 @@ hospital_management_system/
 ├── server/                          # ⚙️ BACKEND SOURCE
 │   ├── config/
 │   │   ├── database.js              #   MongoDB connection
-│   │   └── cloudinary.js            #   Cloudinary setup
+│   │   ├── cloudinary.js            #   Cloudinary setup
+│   │   └── redis.js                 #   ⚡ Redis client (ioredis + Upstash)
 │   ├── controllers/
 │   │   ├── Admincontroller.js       #   Admin business logic
 │   │   ├── Doctorcontroller.js      #   Doctor business logic
 │   │   ├── Patientcontroller.js     #   Patient business logic
 │   │   ├── ReportController.js      #   Medical records logic
-│   │   ├── Login.js                 #   Auth logic (login, password)
+│   │   ├── Login.js                 #   Auth logic (login, refresh, logout, password)
 │   │   ├── Common.js                #   Shared (contact, AI, images)
 │   │   └── overview.js              #   Dashboard stats logic
 │   ├── middlewares/
-│   │   ├── auth.js                  #   JWT verify + role guards
-│   │   └── isDemo.js                #   Demo account restrictions
+│   │   ├── auth.js                  #   JWT access token verify + role guards
+│   │   ├── isDemo.js                #   Demo account restrictions
+│   │   └── rateLimiter.js           #   ⚡ 3-tier rate limiting (Redis-backed)
 │   ├── models/
 │   │   ├── Patient.js               #   Patient schema
 │   │   ├── Doctor.js                #   Doctor schema
@@ -580,7 +623,7 @@ hospital_management_system/
 │   │   ├── Department.js            #   Department schema
 │   │   └── OTP.js                   #   OTP schema (TTL)
 │   ├── routes/
-│   │   ├── Auth_routes.js           #   /api/v1/auth/*
+│   │   ├── Auth_routes.js           #   /api/v1/auth/* (with rate limiters)
 │   │   ├── Patient_routes.js        #   /api/v1/Patient/*
 │   │   ├── Doctor_routes.js         #   /api/v1/Doctor/*
 │   │   ├── Admin_routes.js          #   /api/v1/Admin/*
@@ -594,8 +637,9 @@ hospital_management_system/
 │   │   └── AppointmentExpiryMa...   #     Expiry reminders
 │   ├── utils/
 │   │   ├── mailSender.js            #   Resend email API client
-│   │   └── FileUploader.js          #   Cloudinary upload helper
-│   ├── index.js                     #   Server entry point
+│   │   ├── FileUploader.js          #   Cloudinary upload helper
+│   │   └── tokenService.js          #   ⚡ Access/refresh token generation & revocation
+│   ├── index.js                     #   Server entry point (+ global rate limiter)
 │   └── package.json                 #   Backend dependencies
 │
 ├── package.json                     # Frontend dependencies + scripts
@@ -615,6 +659,7 @@ Make sure you have the following installed on your machine:
 - **Node.js** (v18 or higher) — [Download](https://nodejs.org/)
 - **npm** (v9 or higher) — Comes with Node.js
 - **MongoDB Atlas** account — [Sign up free](https://www.mongodb.com/cloud/atlas)
+- **Redis** — Either local (`brew install redis`) or cloud via [Upstash](https://upstash.com/) (free tier, no credit card)
 - **Cloudinary** account — [Sign up free](https://cloudinary.com/)
 - **Resend** account + verified domain (for email service) — [Sign up free](https://resend.com/)
 - **Google AI API Key** (for Gemini chatbot) — [Get key](https://ai.google.dev/)
@@ -662,6 +707,13 @@ MONGODB_URL = mongodb+srv://<username>:<password>@cluster.mongodb.net/<dbname>
 # JWT
 JWT_SECRET = your_jwt_secret_key_here
 
+# Redis (Upstash or local)
+REDIS_URL = rediss://default:<password>@<host>.upstash.io:6379
+
+# Token Configuration
+ACCESS_TOKEN_EXPIRY = 15m
+REFRESH_TOKEN_TTL = 604800
+
 # Cloudinary
 CLOUD_NAME = your_cloudinary_cloud_name
 API_KEY = your_cloudinary_api_key
@@ -679,6 +731,8 @@ CORS_ORIGIN = http://localhost:3000
 ```
 
 > **Note:** The email system uses [Resend](https://resend.com/) with a verified custom domain. You need to add your domain on Resend's dashboard and configure the DNS records (MX, SPF, DKIM) to start sending emails.
+>
+> **Redis:** For local development, use `redis://127.0.0.1:6379`. For production, use [Upstash](https://upstash.com/) with `rediss://` (TLS). The free tier provides 10,000 commands/day.
 
 **5. Run the application**
 
@@ -713,7 +767,10 @@ http://localhost:3000
 | `REACT_APP_BASE_URL` | Root `.env` | Backend API base URL |
 | `PORT` | `server/.env` | Backend server port |
 | `MONGODB_URL` | `server/.env` | MongoDB Atlas connection string |
-| `JWT_SECRET` | `server/.env` | Secret key for JWT token signing |
+| `JWT_SECRET` | `server/.env` | Secret key for JWT access token signing |
+| `REDIS_URL` | `server/.env` | Redis connection URL (Upstash: `rediss://...`, Local: `redis://127.0.0.1:6379`) |
+| `ACCESS_TOKEN_EXPIRY` | `server/.env` | JWT access token lifetime (default: `15m`) |
+| `REFRESH_TOKEN_TTL` | `server/.env` | Refresh token TTL in seconds (default: `604800` = 7 days) |
 | `CLOUD_NAME` | `server/.env` | Cloudinary cloud name |
 | `API_KEY` | `server/.env` | Cloudinary API key |
 | `API_SECRET` | `server/.env` | Cloudinary API secret |
@@ -728,14 +785,18 @@ http://localhost:3000
 
 ### Authentication (`/api/v1/auth`)
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/login` | ❌ | Login (Doctor/Patient/Admin) |
-| `POST` | `/signup` | ❌ | Patient registration |
-| `POST` | `/sendotp` | ❌ | Send email verification OTP |
-| `POST` | `/change-password` | ✅ | Change user password |
-| `POST` | `/contact` | ❌ | Submit contact form |
-| `POST` | `/chat` | ❌ | AI chatbot (Gemini) |
+| Method | Endpoint | Auth | Rate Limit | Description |
+|---|---|---|---|---|
+| `POST` | `/login` | ❌ | 🔒 authLimiter (10/15min) | Login — returns access token + refresh token cookie |
+| `POST` | `/signup` | ❌ | 🔒 authLimiter (10/15min) | Patient registration |
+| `POST` | `/sendotp` | ❌ | 🔒 authLimiter (10/15min) | Send email verification OTP |
+| `POST` | `/refresh` | ❌ (cookie) | — | Exchange refresh token for new access token (token rotation) |
+| `POST` | `/logout` | ❌ (cookie) | — | Revoke refresh token from Redis + clear cookie |
+| `POST` | `/change-password` | ✅ | 🔒 strictLimiter (5/15min) | Change password + revoke refresh token |
+| `POST` | `/contact` | ❌ | 🔒 strictLimiter (5/15min) | Submit contact form |
+| `POST` | `/chat` | ❌ | — | AI chatbot (Gemini) |
+
+> **Note:** All `/api/v1/*` routes also pass through a **global `apiLimiter`** (100 requests/min per IP).
 
 ### Patient Routes (`/api/v1/Patient`)
 
