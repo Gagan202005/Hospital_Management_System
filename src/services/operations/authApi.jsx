@@ -1,7 +1,7 @@
 import { setLoading, setToken } from "../../Slices/authslice"
 import { setUser } from "../../Slices/profileslice"
 import { endpoints } from "../api"
-import { apiConnector } from "../apiConnector"
+import { apiConnector, axiosInstance } from "../apiConnector"
 
 const {
   SENDOTP_API,
@@ -10,6 +10,7 @@ const {
   CHANGE_PASSWORD_API,
   GEMINI_CHAT_API,
   CONTACT_US_API,
+  LOGOUT_API,
 } = endpoints
 
 
@@ -90,12 +91,12 @@ export function login(email, password, accountType, navigate){
                 throw new Error(response.data.message);
             }
             else{
-                localStorage.setItem("token", JSON.stringify(response.data.token));
+                localStorage.setItem("token", JSON.stringify(response.data.accessToken));
                 localStorage.setItem("user", JSON.stringify(response.data.user));
                 
                 // Assuming your slice actions accept payload
                 dispatch(setUser(response.data.user));
-                dispatch(setToken(response.data.token));
+                dispatch(setToken(response.data.accessToken));
                 navigate("/");
             }
         }
@@ -111,7 +112,13 @@ export function login(email, password, accountType, navigate){
 }
 
 export function logout(navigate){
-    return (dispatch) =>{
+    return async (dispatch) =>{
+        try {
+            // Call server to revoke refresh token from Redis
+            await apiConnector("POST", LOGOUT_API);
+        } catch (error) {
+            console.log("LOGOUT API ERROR............", error);
+        }
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         dispatch(setUser(null));

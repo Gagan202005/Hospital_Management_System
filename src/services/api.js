@@ -8,6 +8,8 @@ export const endpoints = {
   SIGNUP_API: BASE_URL + "/auth/signup",
   LOGIN_API: BASE_URL + "/auth/login",
   CHANGE_PASSWORD_API : BASE_URL + "/auth/change-password",
+  REFRESH_TOKEN_API: BASE_URL + "/auth/refresh",
+  LOGOUT_API: BASE_URL + "/auth/logout",
   CONTACT_US_API: BASE_URL + "/auth/contact",
   GEMINI_CHAT_API : BASE_URL + "/auth/chat",
 };

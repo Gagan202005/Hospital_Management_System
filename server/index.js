@@ -12,6 +12,10 @@ const fileUpload = require("express-fileupload");
 // Config & Utilities
 const database = require("./config/database");
 const { cloudinaryconnect } = require("./config/cloudinary");
+const redis = require("./config/redis");
+
+// Rate Limiting
+const { apiLimiter } = require("./middlewares/rateLimiter");
 
 // Routes
 const AuthRoutes = require("./routes/Auth_routes");
@@ -63,6 +67,9 @@ app.use(
 // =================================================================
 // ROUTES
 // =================================================================
+
+// Apply global rate limiter to all API routes
+app.use("/api/v1", apiLimiter);
 
 app.use("/api/v1/auth", AuthRoutes);
 app.use("/api/v1/Patient", PatientRoutes);
