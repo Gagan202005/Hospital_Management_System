@@ -41,7 +41,7 @@ exports.auth = async (req,res,next) =>{
 exports.isPatient= async(req,res,next) => {
     try{
         if(req.user.accountType!=="Patient"){
-            return res.status(401)({
+            return res.status(401).json({
                 success:false,
                 message:"this is a protected route for patients only",
             });
@@ -60,7 +60,7 @@ exports.isPatient= async(req,res,next) => {
 exports.isDoctor= async(req,res,next) => {
     try{
         if(req.user.accountType!=="Doctor"){
-            return res.status(401)({
+            return res.status(401).json({
                 success:false,
                 message:"this is a protected route for doctors only",
             });

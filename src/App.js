@@ -1,7 +1,10 @@
 import './App.css';
 import { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { jwtDecode } from "jwt-decode";
+import { setToken } from './Slices/authslice';
+import { setUser } from './Slices/profileslice';
 
 // Components
 import OpenRoute from './Components/Common/Openroute.jsx';
@@ -52,13 +55,16 @@ import PatientOverview from "./Components/Core/Patient/PatientOverview";
 
 function App() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   // --- AUTOMATIC LOGOUT ON TOKEN EXPIRY ---
   useEffect(() => {
     const checkTokenExpiration = () => {
-      const token = localStorage.getItem("token");
-      if (token) {
+      const raw = localStorage.getItem("token");
+      if (raw) {
         try {
+          // Token is stored via JSON.stringify, so parse it first
+          const token = JSON.parse(raw);
           // Decode token to find expiration time (exp is in seconds)
           const decodedToken = jwtDecode(token);
           const currentTime = Date.now() / 1000;
@@ -66,20 +72,26 @@ function App() {
           // If token expired, clear storage and kick user out
           if (decodedToken.exp < currentTime) {
             console.warn("Session expired. Logging out...");
-            localStorage.clear();
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            dispatch(setToken(null));
+            dispatch(setUser(null));
             navigate("/login");
           }
         } catch (error) {
           // If token is malformed/corrupt
           console.error("Invalid token detected.", error);
-          localStorage.clear();
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          dispatch(setToken(null));
+          dispatch(setUser(null));
           navigate("/login");
         }
       }
     };
 
     checkTokenExpiration();
-  }, [navigate]);
+  }, [navigate, dispatch]);
 
   return (
     <div>

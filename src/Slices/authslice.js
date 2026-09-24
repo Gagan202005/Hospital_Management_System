@@ -15,10 +15,14 @@ const authSlice =createSlice({
             state.signupData = value.payload;
         },
         setLoading(state, value) {
-        state.loading = value.payload;
+            state.loading = value.payload;
         },
-        setToken(state){
-            state.token=localStorage.getItem("token") ?JSON.parse(localStorage.getItem("token")):null;
+        setToken(state, action){
+            if (action.payload !== undefined) {
+                state.token = action.payload;
+            } else {
+                state.token = localStorage.getItem("token") ? JSON.parse(localStorage.getItem("token")) : null;
+            }
         }
     }
 });
