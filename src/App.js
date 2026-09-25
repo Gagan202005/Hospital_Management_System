@@ -5,6 +5,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { jwtDecode } from "jwt-decode";
 import { setToken } from './Slices/authslice';
 import { setUser } from './Slices/profileslice';
+import { axiosInstance } from './services/apiConnector';
 
 // Components
 import OpenRoute from './Components/Common/Openroute.jsx';
@@ -57,9 +58,9 @@ function App() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  // --- AUTOMATIC LOGOUT ON TOKEN EXPIRY ---
+  // --- AUTOMATIC TOKEN REFRESH ON EXPIRY ---
   useEffect(() => {
-    const checkTokenExpiration = () => {
+    const checkTokenExpiration = async () => {
       const raw = localStorage.getItem("token");
       if (raw) {
         try {
@@ -69,14 +70,27 @@ function App() {
           const decodedToken = jwtDecode(token);
           const currentTime = Date.now() / 1000;
 
-          // If token expired, clear storage and kick user out
+          // If access token expired, try to silently refresh using the refresh token cookie
           if (decodedToken.exp < currentTime) {
-            console.warn("Session expired. Logging out...");
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-            dispatch(setToken(null));
-            dispatch(setUser(null));
-            navigate("/login");
+            console.warn("Access token expired. Attempting silent refresh...");
+            try {
+              const BASE_URL = process.env.REACT_APP_BASE_URL;
+              const { data } = await axiosInstance.post(`${BASE_URL}/auth/refresh`);
+              const newToken = data.accessToken;
+
+              // Update localStorage and Redux with the fresh access token
+              localStorage.setItem("token", JSON.stringify(newToken));
+              dispatch(setToken(newToken));
+              console.log("Token refreshed successfully.");
+            } catch (refreshError) {
+              // Refresh token also expired or invalid — force logout
+              console.warn("Refresh token invalid. Logging out...");
+              localStorage.removeItem("token");
+              localStorage.removeItem("user");
+              dispatch(setToken(null));
+              dispatch(setUser(null));
+              navigate("/login");
+            }
           }
         } catch (error) {
           // If token is malformed/corrupt
